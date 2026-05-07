@@ -8,14 +8,12 @@ import {
 export class CreateUserDto {
   @IsString()
   name: string;
-
-  @IsString()
   @Length(11)
-  phone: string;
-
   @IsString()
+  phone: string;
   @MinLength(6)
   @MaxLength(12)
+  @IsString()
   password: string;
 }
 

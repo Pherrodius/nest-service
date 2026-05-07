@@ -11,9 +11,83 @@ datasource db {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  phone       String   @unique
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  phone       String       @unique
   password    String
-  createdTime DateTime @default(now())
+  createdTime DateTime     @default(now())
+  collect     Collection[]
+}
+
+enum QuestionType {
+  SingleChoice
+  MultiChoice
+  TrueFalse
+}
+
+enum Answer {
+  A
+  B
+  C
+  D
+}
+
+model Question {
+  id                Int                 @id @default(autoincrement())
+  type              QuestionType
+  content           String
+  options           Option[]
+  discipline        String
+  subDiscipline     String?
+  createdTime       DateTime            @default(now())
+  singleAnswer      SingleAnswer?
+  multiChoiceAnswer MultiChoiceAnswer[]
+  trueFalseAnswer   TrueFalseAnswer?
+  collected         Collection[]
+  likes             Int                 @default(0)
+  dislikes          Int                 @default(0)
+}
+
+model Option {
+  id         Int      @id @default(autoincrement())
+  key        Answer
+  text       String
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@unique([questionId, key])
+}
+
+model SingleAnswer {
+  questionId Int      @id
+  answerKey  Answer
+  question   Question @relation(fields: [questionId], references: [id])
+}
+
+model MultiChoiceAnswer {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  answerKey  Answer
+  question   Question @relation(fields: [questionId], references: [id])
+}
+
+model TrueFalseAnswer {
+  questionId Int      @id
+  answerKey  Answer
+  question   Question @relation(fields: [questionId], references: [id])
+}
+
+enum CollectionType {
+  Mistake
+  Note
+}
+
+model Collection {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  questionId  Int
+  createdTime DateTime       @default(now())
+  type        CollectionType @default(Note)
+  creator     User           @relation(fields: [userId], references: [id])
+  question    Question       @relation(fields: [questionId], references: [id])
 }

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { UserService } from './user.service';
-import type { CreateUserDto, UpdateUserDto } from './dto';
+import { CreateUserDto, UpdateUserDto } from './dto';
 import { ParseIntPipe } from '@nestjs/common';
 @Controller('user')
 export class UserController {
@@ -13,7 +13,6 @@ export class UserController {
 
   @Get('search')
   search(@Query('id', ParseIntPipe) id: number) {
-    console.log('searched');
     return this.user.search(id);
   }
 
@@ -24,7 +23,6 @@ export class UserController {
 
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUserDto) {
-    console.log('update');
     return this.user.update(id, body);
   }
 }

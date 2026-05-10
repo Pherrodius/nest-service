@@ -5,21 +5,20 @@ import {
   checkAnswerDto,
   createCollectionDto,
   getCollectionDto,
+  createBankDto,
+  getBankDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
 
 const isValid = (q: createQuestionDto) => {
-  // 基础校验
   if (!q.options || q.options.length === 0) return false;
 
   const optionKeys = q.options.map((o) => o.key);
 
-  // key 唯一性
   const uniqueKeys = new Set(optionKeys);
   if (uniqueKeys.size !== optionKeys.length) return false;
 
-  // 判断题
   if (q.type === QuestionType.TrueFalse) {
     return (
       q.options.length === 2 &&
@@ -28,12 +27,10 @@ const isValid = (q: createQuestionDto) => {
     );
   }
 
-  // 单选题
   if (q.type === QuestionType.SingleChoice) {
     return !Array.isArray(q.answer) && optionKeys.includes(q.answer);
   }
 
-  // 多选题
   if (q.type === QuestionType.MultiChoice) {
     return (
       Array.isArray(q.answer) &&
@@ -44,20 +41,44 @@ const isValid = (q: createQuestionDto) => {
 
   return false;
 };
+
 @Injectable()
 export class QuestionService {
   constructor(private prismaService: PrismaService) {}
+
   async createQuestion(dto: createQuestionDto) {
     if (!isValid(dto)) {
       throw new Error(`Invalid question :${dto.content.slice(0, 10)}...`);
     }
     return this.prismaService.$transaction(async (tx) => {
+      if (
+        !(await tx.bank.findUnique({
+          where: {
+            name: dto.bank,
+          },
+        }))
+      ) {
+        throw new Error(`bank ${dto.bank} not found`);
+      }
+      await tx.discipline.upsert({
+        where: {
+          bankName_name: {
+            bankName: dto.bank,
+            name: dto.discipline,
+          },
+        },
+        update: {},
+        create: {
+          name: dto.discipline,
+          bankName: dto.bank,
+        },
+      });
       const question = await tx.question.create({
         data: {
           type: dto.type,
           content: dto.content,
+          bank: dto.bank,
           discipline: dto.discipline,
-          subDiscipline: dto.subDiscipline,
         },
       });
       await tx.option.createMany({
@@ -107,13 +128,86 @@ export class QuestionService {
       };
     });
   }
+
   async createManyQuestions(dto: createQuestionDto[]) {
     const validQuestions = dto.filter(isValid);
     const invalidQuestions = dto.filter((q) => !isValid(q));
 
-    const results = await Promise.all(
-      validQuestions.map((q) => this.createQuestion(q)),
-    );
+    const results = await this.prismaService.$transaction(async (tx) => {
+      const disciplineSet = new Set<string>();
+      validQuestions.forEach((q) => {
+        disciplineSet.add(`${q.bank}:${q.discipline}`);
+      });
+
+      for (const key of disciplineSet) {
+        const [bank, name] = key.split(':');
+        await tx.discipline.upsert({
+          where: {
+            bankName_name: {
+              bankName: bank,
+              name: name,
+            },
+          },
+          update: {},
+          create: {
+            name: name,
+            bankName: bank,
+          },
+        });
+      }
+      class result extends createQuestionDto {
+        id: number;
+      }
+      const results: result[] = [];
+      for (const q of validQuestions) {
+        const bank = await tx.bank.findUnique({ where: { name: q.bank } });
+        if (!bank) continue;
+
+        const question = await tx.question.create({
+          data: {
+            type: q.type,
+            content: q.content,
+            bank: q.bank,
+            discipline: q.discipline,
+          },
+        });
+
+        await tx.option.createMany({
+          data: q.options.map((o) => ({
+            key: o.key,
+            text: o.text,
+            questionId: question.id,
+          })),
+        });
+
+        if (q.type === QuestionType.SingleChoice) {
+          await tx.singleAnswer.create({
+            data: {
+              answerKey: q.answer as Answer,
+              questionId: question.id,
+            },
+          });
+        } else if (q.type === QuestionType.MultiChoice) {
+          await tx.multiChoiceAnswer.createMany({
+            data: (q.answer as Answer[]).map((a) => ({
+              answerKey: a,
+              questionId: question.id,
+            })),
+          });
+        } else if (q.type === QuestionType.TrueFalse) {
+          await tx.trueFalseAnswer.create({
+            data: {
+              answerKey: q.answer as Answer,
+              questionId: question.id,
+            },
+          });
+        }
+
+        results.push({ id: question.id, ...q });
+      }
+
+      return results;
+    });
 
     return {
       success: results.length,
@@ -121,13 +215,14 @@ export class QuestionService {
       questions: results,
     };
   }
+
   getQuestions(dto: getQuestionDto) {
     return this.prismaService.question.findMany({
       where: {
         type: dto.type,
         content: { contains: dto.content },
+        bank: dto.bank,
         discipline: dto.discipline,
-        subDiscipline: dto.subDiscipline,
       },
       include: {
         options: true,
@@ -135,6 +230,7 @@ export class QuestionService {
       take: dto.number || 10,
     });
   }
+
   getQuestion(id: number) {
     return this.prismaService.question.findUnique({
       where: {
@@ -145,6 +241,7 @@ export class QuestionService {
       },
     });
   }
+
   async checkAnswer(dto: checkAnswerDto) {
     return this.prismaService.$transaction(async (tx) => {
       const question = await tx.question.findUnique({
@@ -224,6 +321,7 @@ export class QuestionService {
       };
     });
   }
+
   async checkManyAnswers(dto: checkAnswerDto[]) {
     const results = await Promise.all(dto.map((q) => this.checkAnswer(q)));
     const correct = results.filter((r) => r.isCorrect);
@@ -234,6 +332,7 @@ export class QuestionService {
       results,
     };
   }
+
   async createCollection(dto: createCollectionDto) {
     return this.prismaService.collection.create({
       data: {
@@ -243,8 +342,9 @@ export class QuestionService {
       },
     });
   }
+
   async getCollection(dto: getCollectionDto) {
-    const collection = await this.prismaService.collection.findMany({
+    const records = await this.prismaService.collection.findMany({
       where: {
         userId: dto.id,
         type: dto.type,
@@ -252,21 +352,65 @@ export class QuestionService {
       include: {
         question: true,
       },
-      skip: (dto.currentPage - 1) * dto.pageSize,
-      take: dto.pageSize,
+      skip: ((dto.page || 1) - 1) * (dto.size || 10),
+      take: dto.size || 10,
     });
     return {
       userId: dto.id,
       type: dto.type,
-      collections: collection.map((c) => c.question),
-      currentPage: dto.currentPage,
-      pageSize: dto.pageSize,
+      records: records.map((c) => c.question),
+      page: dto.page || 1,
+      size: dto.size || 10,
       total: await this.prismaService.collection.count({
         where: {
           userId: dto.id,
           type: dto.type,
         },
       }),
+    };
+  }
+  async deleteCollection(id: number) {
+    return this.prismaService.collection.delete({
+      where: {
+        id,
+      },
+    });
+  }
+
+  async createBank(dto: createBankDto) {
+    return this.prismaService.bank.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        creator: dto.creator,
+      },
+    });
+  }
+
+  async getBankList(dto: getBankDto) {
+    const records = await this.prismaService.bank.findMany({
+      where: {
+        name: dto.name,
+        description: { contains: dto.description },
+        creator: { contains: dto.creator },
+      },
+      include: {
+        disciplines: true,
+      },
+      skip: ((dto.page || 1) - 1) * (dto.size || 10),
+      take: dto.size || 10,
+    });
+    return {
+      records,
+      total: await this.prismaService.bank.count({
+        where: {
+          name: dto.name,
+          description: { contains: dto.description },
+          creator: { contains: dto.creator },
+        },
+      }),
+      page: dto.page || 1,
+      size: dto.size || 10,
     };
   }
 }

@@ -7,6 +7,8 @@ import {
   ArrayMinSize,
   ValidateNested,
   IsNumber,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -39,11 +41,11 @@ export class createQuestionDto {
 
   @IsString()
   @IsNotEmpty()
-  discipline: string;
+  bank: string;
 
-  @IsOptional()
   @IsString()
-  subDiscipline?: string;
+  @IsNotEmpty()
+  discipline: string;
 }
 
 export class getQuestionDto {
@@ -55,10 +57,10 @@ export class getQuestionDto {
   content?: string;
   @IsString()
   @IsOptional()
-  discipline?: string;
+  bank?: string;
   @IsOptional()
   @IsString()
-  subDiscipline?: string;
+  discipline: string;
   @IsOptional()
   @IsNumber()
   number?: number;
@@ -85,10 +87,48 @@ export class getCollectionDto {
   id: number;
   @IsEnum(CollectionType)
   type: CollectionType;
-  @IsNumber()
-  pageSize: number;
-  @IsNumber()
-  currentPage: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  size?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
   @IsOptional()
   total?: number;
+}
+export class createBankDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+  @IsString()
+  @IsNotEmpty()
+  creator: string;
+}
+export class getBankDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+  @IsString()
+  @IsOptional()
+  description?: string;
+  @IsString()
+  @IsOptional()
+  creator?: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  size?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 }

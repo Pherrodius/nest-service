@@ -17,6 +17,7 @@ model User {
   password    String
   createdTime DateTime     @default(now())
   collect     Collection[]
+  banks       Bank[]
 }
 
 enum QuestionType {
@@ -37,15 +38,32 @@ model Question {
   type              QuestionType
   content           String
   options           Option[]
+  bank              String
   discipline        String
-  subDiscipline     String?
   createdTime       DateTime            @default(now())
   singleAnswer      SingleAnswer?
   multiChoiceAnswer MultiChoiceAnswer[]
   trueFalseAnswer   TrueFalseAnswer?
   collected         Collection[]
-  likes             Int                 @default(0)
-  dislikes          Int                 @default(0)
+  Bank              Bank                @relation(fields: [bank], references: [name])
+}
+
+model Bank {
+  name        String       @id @unique
+  description String
+  questions   Question[]
+  disciplines Discipline[]
+  creator     String
+  Creator     User         @relation(fields: [creator], references: [name])
+  createdTime DateTime     @default(now())
+}
+
+model Discipline {
+  name       String
+  bankName   String
+  discipline Bank?  @relation(fields: [bankName], references: [name])
+
+  @@unique([bankName, name])
 }
 
 model Option {

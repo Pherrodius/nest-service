@@ -18,6 +18,7 @@ model User {
   createdTime DateTime     @default(now())
   collect     Collection[]
   banks       Bank[]
+  resolutions Resolution[]
 }
 
 enum QuestionType {
@@ -33,37 +34,39 @@ enum Answer {
   D
 }
 
+model Bank {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String
+  questions   Question[]
+  disciplines Discipline[]
+  creatorId   Int
+  creator     User         @relation(fields: [creatorId], references: [id])
+  createdTime DateTime     @default(now())
+}
+
+model Discipline {
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
+  discipline Bank[]
+  questions  Question[]
+}
+
 model Question {
   id                Int                 @id @default(autoincrement())
   type              QuestionType
   content           String
   options           Option[]
-  bank              String
-  discipline        String
+  bankId            Int
+  disciplineId      Int
   createdTime       DateTime            @default(now())
   singleAnswer      SingleAnswer?
   multiChoiceAnswer MultiChoiceAnswer[]
   trueFalseAnswer   TrueFalseAnswer?
   collected         Collection[]
-  Bank              Bank                @relation(fields: [bank], references: [name])
-}
-
-model Bank {
-  name        String       @id @unique
-  description String
-  questions   Question[]
-  disciplines Discipline[]
-  creator     String
-  Creator     User         @relation(fields: [creator], references: [name])
-  createdTime DateTime     @default(now())
-}
-
-model Discipline {
-  name       String
-  bankName   String
-  discipline Bank?  @relation(fields: [bankName], references: [name])
-
-  @@unique([bankName, name])
+  bank              Bank                @relation(fields: [bankId], references: [id])
+  discipline        Discipline          @relation(fields: [disciplineId], references: [id])
+  resolutions       Resolution[]
 }
 
 model Option {
@@ -104,8 +107,21 @@ model Collection {
   id          Int            @id @default(autoincrement())
   userId      Int
   questionId  Int
-  createdTime DateTime       @default(now())
+  updatedTime DateTime       @default(now())
   type        CollectionType @default(Note)
   creator     User           @relation(fields: [userId], references: [id])
   question    Question       @relation(fields: [questionId], references: [id])
+
+  @@unique([userId, questionId, type])
+}
+
+model Resolution {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  questionId  Int
+  updatedTime DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  question    Question @relation(fields: [questionId], references: [id])
+
+  @@unique([userId, questionId])
 }

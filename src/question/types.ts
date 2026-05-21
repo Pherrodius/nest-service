@@ -97,7 +97,7 @@ export interface Collection {
   id: number;
   userId: number;
   questionId: number;
-  createdTime: Date;
+  updatedTime: Date;
   type: CollectionType;
 }
 

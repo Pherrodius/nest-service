@@ -15,8 +15,18 @@ export class CreateUserDto {
   @MaxLength(12)
   @IsString()
   password: string;
+  @IsString()
+  @MinLength(6)
+  @MaxLength(12)
+  confirmPassword: string;
 }
-
+export class LoginDto {
+  @IsString()
+  @Length(11)
+  phone: string;
+  @IsString()
+  password: string;
+}
 export class UpdateUserDto {
   @IsOptional()
   @IsString()

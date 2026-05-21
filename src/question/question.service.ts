@@ -5,8 +5,9 @@ import {
   checkAnswerDto,
   createCollectionDto,
   getCollectionDto,
-  createBankDto,
-  getBankDto,
+  deleteAllCollectionsDto,
+  getResolutionsDto,
+  isCollectionExistDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -46,39 +47,27 @@ const isValid = (q: createQuestionDto) => {
 export class QuestionService {
   constructor(private prismaService: PrismaService) {}
 
+  // 创建问题
   async createQuestion(dto: createQuestionDto) {
     if (!isValid(dto)) {
       throw new Error(`Invalid question :${dto.content.slice(0, 10)}...`);
     }
+
     return this.prismaService.$transaction(async (tx) => {
-      if (
-        !(await tx.bank.findUnique({
-          where: {
-            name: dto.bank,
-          },
-        }))
-      ) {
-        throw new Error(`bank ${dto.bank} not found`);
-      }
-      await tx.discipline.upsert({
-        where: {
-          bankName_name: {
-            bankName: dto.bank,
-            name: dto.discipline,
-          },
-        },
-        update: {},
-        create: {
-          name: dto.discipline,
-          bankName: dto.bank,
-        },
-      });
       const question = await tx.question.create({
         data: {
           type: dto.type,
           content: dto.content,
-          bank: dto.bank,
-          discipline: dto.discipline,
+          bank: {
+            connect: {
+              name: dto.bank,
+            },
+          },
+          discipline: {
+            connect: {
+              name: dto.discipline,
+            },
+          },
         },
       });
       await tx.option.createMany({
@@ -128,47 +117,28 @@ export class QuestionService {
       };
     });
   }
-
+  // 创建多个问题
   async createManyQuestions(dto: createQuestionDto[]) {
     const validQuestions = dto.filter(isValid);
     const invalidQuestions = dto.filter((q) => !isValid(q));
 
     const results = await this.prismaService.$transaction(async (tx) => {
-      const disciplineSet = new Set<string>();
-      validQuestions.forEach((q) => {
-        disciplineSet.add(`${q.bank}:${q.discipline}`);
-      });
-
-      for (const key of disciplineSet) {
-        const [bank, name] = key.split(':');
-        await tx.discipline.upsert({
-          where: {
-            bankName_name: {
-              bankName: bank,
-              name: name,
-            },
-          },
-          update: {},
-          create: {
-            name: name,
-            bankName: bank,
-          },
-        });
-      }
-      class result extends createQuestionDto {
-        id: number;
-      }
-      const results: result[] = [];
+      const results: (createQuestionDto & { id: number })[] = [];
       for (const q of validQuestions) {
-        const bank = await tx.bank.findUnique({ where: { name: q.bank } });
-        if (!bank) continue;
-
         const question = await tx.question.create({
           data: {
             type: q.type,
             content: q.content,
-            bank: q.bank,
-            discipline: q.discipline,
+            bank: {
+              connect: {
+                name: q.bank,
+              },
+            },
+            discipline: {
+              connect: {
+                name: q.discipline,
+              },
+            },
           },
         });
 
@@ -215,22 +185,24 @@ export class QuestionService {
       questions: results,
     };
   }
-
+  // 获取问题列表
   getQuestions(dto: getQuestionDto) {
     return this.prismaService.question.findMany({
       where: {
         type: dto.type,
         content: { contains: dto.content },
-        bank: dto.bank,
-        discipline: dto.discipline,
+        bankId: dto.bankId,
+        disciplineId: dto.disciplineId,
+        bank: { name: dto.bank },
+        discipline: { name: dto.discipline },
       },
       include: {
         options: true,
       },
-      take: dto.number || 10,
+      take: dto.number,
     });
   }
-
+  // 获取问题
   getQuestion(id: number) {
     return this.prismaService.question.findUnique({
       where: {
@@ -238,10 +210,15 @@ export class QuestionService {
       },
       include: {
         options: true,
+        bank: true,
+        discipline: true,
+        singleAnswer: true,
+        multiChoiceAnswer: true,
+        trueFalseAnswer: true,
       },
     });
   }
-
+  // 检查答案
   async checkAnswer(dto: checkAnswerDto) {
     return this.prismaService.$transaction(async (tx) => {
       const question = await tx.question.findUnique({
@@ -257,13 +234,38 @@ export class QuestionService {
       if (!question) {
         throw new Error(`Question ${dto.questionId} not found`);
       }
+      await tx.resolution.upsert({
+        where: {
+          userId_questionId: {
+            userId: dto.userId,
+            questionId: question.id,
+          },
+        },
+        create: {
+          userId: dto.userId,
+          questionId: question.id,
+        },
+        update: {
+          updatedTime: new Date(),
+        },
+      });
       if (question.type === QuestionType.SingleChoice) {
         if (question.singleAnswer?.answerKey !== dto.answer) {
-          const mistake = await tx.collection.create({
-            data: {
+          const mistake = await tx.collection.upsert({
+            where: {
+              userId_questionId_type: {
+                userId: dto.userId,
+                questionId: question.id,
+                type: CollectionType.Mistake,
+              },
+            },
+            create: {
               userId: dto.userId,
               questionId: question.id,
               type: CollectionType.Mistake,
+            },
+            update: {
+              updatedTime: new Date(),
             },
           });
           return {
@@ -280,11 +282,21 @@ export class QuestionService {
             (a) => !dto.answer.includes(a.answerKey),
           )
         ) {
-          const mistake = await tx.collection.create({
-            data: {
+          const mistake = await tx.collection.upsert({
+            where: {
+              userId_questionId_type: {
+                userId: dto.userId,
+                questionId: question.id,
+                type: CollectionType.Mistake,
+              },
+            },
+            create: {
               userId: dto.userId,
               questionId: question.id,
               type: CollectionType.Mistake,
+            },
+            update: {
+              updatedTime: new Date(),
             },
           });
           return {
@@ -297,11 +309,21 @@ export class QuestionService {
         }
       } else if (question.type === QuestionType.TrueFalse) {
         if (question.trueFalseAnswer?.answerKey !== dto.answer) {
-          const mistake = await tx.collection.create({
-            data: {
+          const mistake = await tx.collection.upsert({
+            where: {
+              userId_questionId_type: {
+                userId: dto.userId,
+                questionId: question.id,
+                type: CollectionType.Mistake,
+              },
+            },
+            create: {
               userId: dto.userId,
               questionId: question.id,
               type: CollectionType.Mistake,
+            },
+            update: {
+              updatedTime: new Date(),
             },
           });
           return {
@@ -321,7 +343,7 @@ export class QuestionService {
       };
     });
   }
-
+  // 检查多个答案
   async checkManyAnswers(dto: checkAnswerDto[]) {
     const results = await Promise.all(dto.map((q) => this.checkAnswer(q)));
     const correct = results.filter((r) => r.isCorrect);
@@ -332,7 +354,7 @@ export class QuestionService {
       results,
     };
   }
-
+  // 创建收藏
   async createCollection(dto: createCollectionDto) {
     return this.prismaService.collection.create({
       data: {
@@ -342,33 +364,89 @@ export class QuestionService {
       },
     });
   }
-
+  // 获取收藏
   async getCollection(dto: getCollectionDto) {
-    const records = await this.prismaService.collection.findMany({
+    const startDay = new Date();
+    startDay.setHours(0, 0, 0, 0);
+    const endDay = new Date();
+    endDay.setHours(23, 59, 59, 999);
+    let records = await this.prismaService.collection.findMany({
       where: {
-        userId: dto.id,
+        userId: dto.userId,
         type: dto.type,
+        question: {
+          bankId: dto.bankId,
+          disciplineId: dto.disciplineId,
+          type: dto.questionType,
+        },
       },
       include: {
-        question: true,
-      },
-      skip: ((dto.page || 1) - 1) * (dto.size || 10),
-      take: dto.size || 10,
-    });
-    return {
-      userId: dto.id,
-      type: dto.type,
-      records: records.map((c) => c.question),
-      page: dto.page || 1,
-      size: dto.size || 10,
-      total: await this.prismaService.collection.count({
-        where: {
-          userId: dto.id,
-          type: dto.type,
+        question: {
+          select: {
+            id: true,
+            type: true,
+            content: true,
+            bankId: true,
+            disciplineId: true,
+            bank: true,
+            discipline: true,
+            createdTime: true,
+            options: true,
+            singleAnswer: dto.detailed,
+            multiChoiceAnswer: dto.detailed,
+            trueFalseAnswer: dto.detailed,
+          },
         },
+      },
+    });
+    if (dto.isDay === 1) {
+      records = records.filter((c) => {
+        return c.updatedTime >= startDay && c.updatedTime <= endDay;
+      });
+    }
+    return {
+      userId: dto.userId,
+      type: dto.type,
+      records: records.map((c) => {
+        return {
+          ...c.question,
+          updatedTime: c.updatedTime,
+        };
       }),
+      total: records.length,
+      mistakes: records.filter((c) => c.type === CollectionType.Mistake).length,
+      notes: records.filter((c) => c.type === CollectionType.Note).length,
     };
   }
+  async isCollectionExist(dto: isCollectionExistDto) {
+    return this.prismaService.$transaction(async (tx) => {
+      const isNoted = await tx.collection.findUnique({
+        where: {
+          userId_questionId_type: {
+            userId: dto.userId,
+            questionId: dto.questionId,
+            type: CollectionType.Note,
+          },
+        },
+      });
+      const isMistake = await tx.collection.findUnique({
+        where: {
+          userId_questionId_type: {
+            userId: dto.userId,
+            questionId: dto.questionId,
+            type: CollectionType.Mistake,
+          },
+        },
+      });
+      return {
+        userId: dto.userId,
+        questionId: dto.questionId,
+        isNoted: isNoted !== null,
+        isMistake: isMistake !== null,
+      };
+    });
+  }
+  // 删除收藏
   async deleteCollection(id: number) {
     return this.prismaService.collection.delete({
       where: {
@@ -376,41 +454,35 @@ export class QuestionService {
       },
     });
   }
-
-  async createBank(dto: createBankDto) {
-    return this.prismaService.bank.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        creator: dto.creator,
+  async deleteAllCollections(dto: deleteAllCollectionsDto) {
+    return this.prismaService.collection.deleteMany({
+      where: {
+        userId: dto.userId,
+        type: dto.type,
+        question: {
+          bankId: dto.bankId,
+          disciplineId: dto.disciplineId,
+        },
       },
     });
   }
-
-  async getBankList(dto: getBankDto) {
-    const records = await this.prismaService.bank.findMany({
+  async getResolutions(dto: getResolutionsDto) {
+    return this.prismaService.resolution.findMany({
       where: {
-        name: dto.name,
-        description: { contains: dto.description },
-        creator: { contains: dto.creator },
-      },
-      include: {
-        disciplines: true,
-      },
-      skip: ((dto.page || 1) - 1) * (dto.size || 10),
-      take: dto.size || 10,
-    });
-    return {
-      records,
-      total: await this.prismaService.bank.count({
-        where: {
-          name: dto.name,
-          description: { contains: dto.description },
-          creator: { contains: dto.creator },
+        userId: dto.userId,
+        question: {
+          bankId: dto.bankId,
+          bank: {
+            name: dto.bankName,
+          },
+          discipline: {
+            name: {
+              contains: dto.disciplineName,
+            },
+          },
+          disciplineId: dto.disciplineId,
         },
-      }),
-      page: dto.page || 1,
-      size: dto.size || 10,
-    };
+      },
+    });
   }
 }

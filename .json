@@ -7,8 +7,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -18,8 +18,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "B",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -29,8 +29,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -40,8 +40,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -51,8 +51,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "B",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -62,8 +62,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -73,8 +73,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -84,8 +84,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "B",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -95,8 +95,8 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   },
   {
     "type": "TrueFalse",
@@ -106,7 +106,7 @@
       { "key": "B", "text": "错误" }
     ],
     "answer": "A",
-    "bank": "计算机",
-    "dscipline": "计算机网络"
+    "bank": "考研计算机",
+    "discipline": "计算机网络"
   }
 ]

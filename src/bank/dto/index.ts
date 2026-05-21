@@ -9,7 +9,6 @@ import {
   IsNumber,
   IsInt,
   Min,
-  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -50,9 +49,6 @@ export class createQuestionDto {
 }
 
 export class getQuestionDto {
-  @IsEnum(CollectionType)
-  @IsOptional()
-  collectionType?: CollectionType;
   @IsEnum(QuestionType)
   @IsOptional()
   type?: QuestionType;
@@ -63,14 +59,8 @@ export class getQuestionDto {
   @IsOptional()
   bank?: string;
   @IsOptional()
-  @IsNumber()
-  bankId?: number;
-  @IsOptional()
   @IsString()
-  discipline?: string;
-  @IsOptional()
-  @IsNumber()
-  disciplineId?: number;
+  discipline: string;
   @IsOptional()
   @IsNumber()
   number?: number;
@@ -94,31 +84,21 @@ export class createCollectionDto {
 }
 export class getCollectionDto {
   @IsNumber()
-  userId: number;
+  id: number;
   @IsEnum(CollectionType)
+  type: CollectionType;
   @IsOptional()
-  type?: CollectionType;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  size?: number;
   @IsOptional()
-  @IsNumber()
-  bankId?: number;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
   @IsOptional()
-  @IsNumber()
-  disciplineId?: number;
-  @IsOptional()
-  @IsEnum([0, 1])
-  isDay?: number;
-  @IsOptional()
-  @IsEnum(QuestionType)
-  questionType?: QuestionType;
-  @IsOptional()
-  @IsBoolean()
-  detailed?: false;
-}
-export class isCollectionExistDto {
-  @IsNumber()
-  userId: number;
-  @IsNumber()
-  questionId: number;
+  total?: number;
 }
 export class createBankDto {
   @IsString()
@@ -144,43 +124,4 @@ export class getBankDto {
   @IsString()
   @IsOptional()
   creator?: string;
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  size?: number;
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-}
-export class deleteAllCollectionsDto {
-  @IsNumber()
-  userId: number;
-  @IsEnum(CollectionType)
-  @IsOptional()
-  type?: CollectionType;
-  @IsOptional()
-  @IsNumber()
-  bankId?: number;
-  @IsOptional()
-  @IsNumber()
-  disciplineId?: number;
-}
-export class getResolutionsDto {
-  @IsNumber()
-  userId: number;
-  @IsOptional()
-  @IsNumber()
-  bankId?: number;
-  @IsOptional()
-  @IsString()
-  bankName?: string;
-  @IsOptional()
-  @IsString()
-  disciplineName?: string;
-  @IsOptional()
-  @IsNumber()
-  disciplineId?: number;
 }

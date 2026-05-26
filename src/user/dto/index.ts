@@ -7,26 +7,34 @@ import {
 } from 'class-validator';
 export class CreateUserDto {
   @IsString()
-  name: string;
+  name!: string;
   @Length(11)
   @IsString()
-  phone: string;
+  phone!: string;
   @MinLength(6)
   @MaxLength(12)
   @IsString()
-  password: string;
+  password!: string;
   @IsString()
   @MinLength(6)
   @MaxLength(12)
-  confirmPassword: string;
+  confirmPassword!: string;
 }
-export class LoginDto {
+export class LoginByPhoneDto {
   @IsString()
   @Length(11)
-  phone: string;
+  phone!: string;
   @IsString()
-  password: string;
+  password!: string;
 }
+
+export class LoginByNameDto {
+  @IsString()
+  name!: string;
+  @IsString()
+  password!: string;
+}
+
 export class UpdateUserDto {
   @IsOptional()
   @IsString()

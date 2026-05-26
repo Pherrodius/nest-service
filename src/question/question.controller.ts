@@ -1,81 +1,103 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
+  Delete,
   Get,
   Param,
+  ParseIntPipe,
+  Post,
   Query,
-  Delete,
 } from '@nestjs/common';
+import { CurrentUser } from '@/auth/current-user.decorator';
+import type { AuthUser } from '@/auth/types';
 import {
-  checkAnswerDto,
   createCollectionDto,
+  createQuestionDto,
   deleteAllCollectionsDto,
   getCollectionDto,
+  getQuestionDto,
   getResolutionsDto,
   isCollectionExistDto,
+  submitTestDto,
 } from './dto';
 import { QuestionService } from './question.service';
-import { createQuestionDto, getQuestionDto } from './dto';
-import { ParseIntPipe } from '@nestjs/common';
+
 @Controller('question')
 export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
-  // 创建问题
+
   @Post()
   createQuestion(@Body() body: createQuestionDto | createQuestionDto[]) {
-    if (Array.isArray(body))
+    if (Array.isArray(body)) {
       return this.questionService.createManyQuestions(body);
-    else {
-      return this.questionService.createQuestion(body);
     }
+
+    return this.questionService.createQuestion(body);
   }
-  // 获取问题列表
+
   @Get()
   getQuestions(@Query() query: getQuestionDto) {
     return this.questionService.getQuestions(query);
   }
-  // 创建收藏
+
   @Post('collection')
-  createCollection(@Body() body: createCollectionDto) {
-    return this.questionService.createCollection(body);
+  createCollection(
+    @Body() body: createCollectionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.createCollection(body, user.id);
   }
-  // 获取收藏
+
   @Get('collection')
-  getCollection(@Query() query: getCollectionDto) {
-    return this.questionService.getCollection(query);
+  getCollection(
+    @Query() query: getCollectionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.getCollection(query, user.id);
   }
-  // 删除收藏
+
   @Delete('collection/:id')
-  deleteCollection(@Param('id', ParseIntPipe) id: number) {
-    return this.questionService.deleteCollection(id);
+  deleteCollection(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.deleteCollection(id, user.id);
   }
-  // 删除所有收藏
+
   @Delete('collection')
-  deleteAllCollections(@Query() query: deleteAllCollectionsDto) {
-    return this.questionService.deleteAllCollections(query);
+  deleteAllCollections(
+    @Query() query: deleteAllCollectionsDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.deleteAllCollections(query, user.id);
   }
-  // 检查收藏是否存在
+
   @Get('collection/exist')
-  isCollectionExist(@Query() query: isCollectionExistDto) {
-    return this.questionService.isCollectionExist(query);
+  isCollectionExist(
+    @Query() query: isCollectionExistDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.isCollectionExist(query, user.id);
   }
-  // 检查答案
-  @Post('check')
-  checkAnswer(@Body() body: checkAnswerDto | checkAnswerDto[]) {
-    if (Array.isArray(body)) return this.questionService.checkManyAnswers(body);
-    else {
-      return this.questionService.checkAnswer(body);
-    }
+
+  @Post('submit')
+  submitTest(@Body() body: submitTestDto, @CurrentUser() user: AuthUser) {
+    return this.questionService.submitTest(body, user.id);
   }
-  // 获取问题
+  @Get('testHistory')
+  getTestHistory(@CurrentUser() user: AuthUser) {
+    return this.questionService.getTestHistory(user.id);
+  }
+  @Get('resolution')
+  getResolutions(
+    @Query() query: getResolutionsDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.getResolutions(query, user.id);
+  }
+
   @Get(':id')
   getQuestion(@Param('id', ParseIntPipe) id: number) {
     return this.questionService.getQuestion(id);
-  }
-  // 获取解决记录
-  @Get('resolution')
-  getResolutions(@Query() query: getResolutionsDto) {
-    return this.questionService.getResolutions(query);
   }
 }

@@ -8,6 +8,7 @@ import {
   deleteAllCollectionsDto,
   getResolutionsDto,
   isCollectionExistDto,
+  submitTestDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -125,55 +126,63 @@ export class QuestionService {
     const results = await this.prismaService.$transaction(async (tx) => {
       const results: (createQuestionDto & { id: number })[] = [];
       for (const q of validQuestions) {
-        const question = await tx.question.create({
-          data: {
-            type: q.type,
-            content: q.content,
-            bank: {
-              connect: {
-                name: q.bank,
-              },
-            },
-            discipline: {
-              connect: {
-                name: q.discipline,
-              },
-            },
-          },
-        });
-
-        await tx.option.createMany({
-          data: q.options.map((o) => ({
-            key: o.key,
-            text: o.text,
-            questionId: question.id,
-          })),
-        });
-
-        if (q.type === QuestionType.SingleChoice) {
-          await tx.singleAnswer.create({
+        try {
+          const question = await tx.question.create({
             data: {
-              answerKey: q.answer as Answer,
-              questionId: question.id,
+              type: q.type,
+              content: q.content,
+              bank: {
+                connect: {
+                  name: q.bank,
+                },
+              },
+              discipline: {
+                connect: {
+                  name: q.discipline,
+                },
+              },
             },
           });
-        } else if (q.type === QuestionType.MultiChoice) {
-          await tx.multiChoiceAnswer.createMany({
-            data: (q.answer as Answer[]).map((a) => ({
-              answerKey: a,
+
+          await tx.option.createMany({
+            data: q.options.map((o) => ({
+              key: o.key,
+              text: o.text,
               questionId: question.id,
             })),
           });
-        } else if (q.type === QuestionType.TrueFalse) {
-          await tx.trueFalseAnswer.create({
-            data: {
-              answerKey: q.answer as Answer,
-              questionId: question.id,
-            },
-          });
-        }
 
-        results.push({ id: question.id, ...q });
+          if (q.type === QuestionType.SingleChoice) {
+            await tx.singleAnswer.create({
+              data: {
+                answerKey: q.answer as Answer,
+                questionId: question.id,
+              },
+            });
+          } else if (q.type === QuestionType.MultiChoice) {
+            await tx.multiChoiceAnswer.createMany({
+              data: (q.answer as Answer[]).map((a) => ({
+                answerKey: a,
+                questionId: question.id,
+              })),
+            });
+          } else if (q.type === QuestionType.TrueFalse) {
+            await tx.trueFalseAnswer.create({
+              data: {
+                answerKey: q.answer as Answer,
+                questionId: question.id,
+              },
+            });
+          }
+
+          results.push({ id: question.id, ...q });
+        } catch (error) {
+          console.error(
+            `Failed to create question: ${q.content.slice(0, 10)}...`,
+            error,
+          );
+          invalidQuestions.push(q);
+        }
       }
 
       return results;
@@ -219,7 +228,7 @@ export class QuestionService {
     });
   }
   // 检查答案
-  async checkAnswer(dto: checkAnswerDto) {
+  async checkAnswer(dto: checkAnswerDto, userId: number) {
     return this.prismaService.$transaction(async (tx) => {
       const question = await tx.question.findUnique({
         where: {
@@ -237,12 +246,12 @@ export class QuestionService {
       await tx.resolution.upsert({
         where: {
           userId_questionId: {
-            userId: dto.userId,
+            userId,
             questionId: question.id,
           },
         },
         create: {
-          userId: dto.userId,
+          userId,
           questionId: question.id,
         },
         update: {
@@ -254,13 +263,13 @@ export class QuestionService {
           const mistake = await tx.collection.upsert({
             where: {
               userId_questionId_type: {
-                userId: dto.userId,
+                userId,
                 questionId: question.id,
                 type: CollectionType.Mistake,
               },
             },
             create: {
-              userId: dto.userId,
+              userId,
               questionId: question.id,
               type: CollectionType.Mistake,
             },
@@ -285,13 +294,13 @@ export class QuestionService {
           const mistake = await tx.collection.upsert({
             where: {
               userId_questionId_type: {
-                userId: dto.userId,
+                userId,
                 questionId: question.id,
                 type: CollectionType.Mistake,
               },
             },
             create: {
-              userId: dto.userId,
+              userId,
               questionId: question.id,
               type: CollectionType.Mistake,
             },
@@ -312,13 +321,13 @@ export class QuestionService {
           const mistake = await tx.collection.upsert({
             where: {
               userId_questionId_type: {
-                userId: dto.userId,
+                userId,
                 questionId: question.id,
                 type: CollectionType.Mistake,
               },
             },
             create: {
-              userId: dto.userId,
+              userId,
               questionId: question.id,
               type: CollectionType.Mistake,
             },
@@ -343,36 +352,69 @@ export class QuestionService {
       };
     });
   }
-  // 检查多个答案
-  async checkManyAnswers(dto: checkAnswerDto[]) {
-    const results = await Promise.all(dto.map((q) => this.checkAnswer(q)));
-    const correct = results.filter((r) => r.isCorrect);
+  // 提交测试
+  async submitTest(dto: submitTestDto, userId: number) {
+    const results = await Promise.all(
+      dto.answerSheet.map((q) => this.checkAnswer(q, userId)),
+    );
+    const correctCount = results.filter((r) => r.isCorrect).length;
+    const wrongCount = results.length - correctCount;
+    const testRecord = await this.prismaService.testHistory.create({
+      data: {
+        userId,
+        bankId: dto.bankId,
+        type: dto.type,
+        accuracy: correctCount / dto.length,
+        takenTime: dto.takenTime,
+        length,
+      },
+    });
     return {
-      userId: dto[0].userId,
-      correctCount: correct.length,
-      wrongCount: results.length - correct.length,
+      userId,
+      correctCount,
+      wrongCount,
       results,
+      testRecord,
     };
   }
+  // 获取测试记录
+  async getTestHistory(userId: number) {
+    const testHistory = await this.prismaService.testHistory.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        bank: true,
+      },
+      orderBy: { createdTime: 'desc' },
+    });
+    const formattedHistory = testHistory.map((record) => {
+      return {
+        ...record,
+        bankName: record.bank.name,
+      };
+    });
+    return formattedHistory;
+  }
   // 创建收藏
-  async createCollection(dto: createCollectionDto) {
+  async createCollection(dto: createCollectionDto, userId: number) {
     return this.prismaService.collection.create({
       data: {
-        userId: dto.userId,
+        userId,
         questionId: dto.questionId,
         type: dto.type || CollectionType.Note,
       },
     });
   }
   // 获取收藏
-  async getCollection(dto: getCollectionDto) {
+  async getCollection(dto: getCollectionDto, userId: number) {
     const startDay = new Date();
     startDay.setHours(0, 0, 0, 0);
     const endDay = new Date();
     endDay.setHours(23, 59, 59, 999);
     let records = await this.prismaService.collection.findMany({
       where: {
-        userId: dto.userId,
+        userId,
         type: dto.type,
         question: {
           bankId: dto.bankId,
@@ -405,7 +447,7 @@ export class QuestionService {
       });
     }
     return {
-      userId: dto.userId,
+      userId,
       type: dto.type,
       records: records.map((c) => {
         return {
@@ -418,12 +460,12 @@ export class QuestionService {
       notes: records.filter((c) => c.type === CollectionType.Note).length,
     };
   }
-  async isCollectionExist(dto: isCollectionExistDto) {
+  async isCollectionExist(dto: isCollectionExistDto, userId: number) {
     return this.prismaService.$transaction(async (tx) => {
       const isNoted = await tx.collection.findUnique({
         where: {
           userId_questionId_type: {
-            userId: dto.userId,
+            userId,
             questionId: dto.questionId,
             type: CollectionType.Note,
           },
@@ -432,32 +474,35 @@ export class QuestionService {
       const isMistake = await tx.collection.findUnique({
         where: {
           userId_questionId_type: {
-            userId: dto.userId,
+            userId,
             questionId: dto.questionId,
             type: CollectionType.Mistake,
           },
         },
       });
       return {
-        userId: dto.userId,
+        userId,
         questionId: dto.questionId,
+        notedId: isNoted?.id,
+        mistakeId: isMistake?.id,
         isNoted: isNoted !== null,
         isMistake: isMistake !== null,
       };
     });
   }
   // 删除收藏
-  async deleteCollection(id: number) {
-    return this.prismaService.collection.delete({
+  async deleteCollection(id: number, userId: number) {
+    return this.prismaService.collection.deleteMany({
       where: {
         id,
+        userId,
       },
     });
   }
-  async deleteAllCollections(dto: deleteAllCollectionsDto) {
+  async deleteAllCollections(dto: deleteAllCollectionsDto, userId: number) {
     return this.prismaService.collection.deleteMany({
       where: {
-        userId: dto.userId,
+        userId,
         type: dto.type,
         question: {
           bankId: dto.bankId,
@@ -466,10 +511,10 @@ export class QuestionService {
       },
     });
   }
-  async getResolutions(dto: getResolutionsDto) {
+  async getResolutions(dto: getResolutionsDto, userId: number) {
     return this.prismaService.resolution.findMany({
       where: {
-        userId: dto.userId,
+        userId,
         question: {
           bankId: dto.bankId,
           bank: {

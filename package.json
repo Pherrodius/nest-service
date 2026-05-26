@@ -22,6 +22,7 @@
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.2",
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/adapter-mariadb": "^7.8.0",
@@ -76,6 +77,10 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1",
+      "^generated/(.*)$": "<rootDir>/../generated/$1"
+    }
   }
 }

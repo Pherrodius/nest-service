@@ -2,8 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -11,20 +12,28 @@ datasource db {
 }
 
 model User {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  phone       String       @unique
-  password    String
-  createdTime DateTime     @default(now())
-  collect     Collection[]
-  banks       Bank[]
-  resolutions Resolution[]
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  phone           String           @unique
+  password        String
+  createdTime     DateTime         @default(now())
+  collect         Collection[]
+  banks           Bank[]
+  resolutions     Resolution[]
+  bankCollections BankCollection[]
+  testHistories   TestHistory[]
 }
 
 enum QuestionType {
   SingleChoice
   MultiChoice
   TrueFalse
+}
+
+enum TestType {
+  SeqPractice
+  RandomPractice
+  Review
 }
 
 enum Answer {
@@ -35,21 +44,32 @@ enum Answer {
 }
 
 model Bank {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  description String
-  questions   Question[]
-  disciplines Discipline[]
-  creatorId   Int
-  creator     User         @relation(fields: [creatorId], references: [id])
-  createdTime DateTime     @default(now())
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  description     String
+  categoryId      Int?
+  category        BankCategory?    @relation(fields: [categoryId], references: [id])
+  questions       Question[]
+  disciplines     Discipline[]
+  creatorId       Int
+  creator         User             @relation(fields: [creatorId], references: [id])
+  createdTime     DateTime         @default(now())
+  bankCollections BankCollection[]
+  testHistories   TestHistory[]
+}
+
+model BankCategory {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  banks Bank[]
 }
 
 model Discipline {
-  id         Int        @id @default(autoincrement())
-  name       String     @unique
-  discipline Bank[]
-  questions  Question[]
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  bank      Bank[]
+  questions Question[]
 }
 
 model Question {
@@ -109,10 +129,21 @@ model Collection {
   questionId  Int
   updatedTime DateTime       @default(now())
   type        CollectionType @default(Note)
-  creator     User           @relation(fields: [userId], references: [id])
+  user        User           @relation(fields: [userId], references: [id])
   question    Question       @relation(fields: [questionId], references: [id])
 
   @@unique([userId, questionId, type])
+}
+
+model BankCollection {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  bankId      Int
+  updatedTime DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  bank        Bank     @relation(fields: [bankId], references: [id])
+
+  @@unique([userId, bankId])
 }
 
 model Resolution {
@@ -124,4 +155,38 @@ model Resolution {
   question    Question @relation(fields: [questionId], references: [id])
 
   @@unique([userId, questionId])
+}
+
+model TestHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  bankId      Int
+  type        TestType
+  accuracy    Float
+  takenTime   Int      @default(0) // 单位：ms
+  length      Int
+  createdTime DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  bank        Bank     @relation(fields: [bankId], references: [id])
+}
+
+model Document {
+  id            Int              @id @default(autoincrement())
+  filename      String           @unique
+  originalName  String
+  url           String
+  size          Int
+  categoryId    Int
+  mimeType      String
+  title         String
+  content       String?
+  downloadCount Int              @default(0)
+  createdTime   DateTime         @default(now())
+  category      DocumentCategory @relation(fields: [categoryId], references: [id])
+}
+
+model DocumentCategory {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  documents Document[]
 }

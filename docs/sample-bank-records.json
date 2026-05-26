@@ -1,0 +1,108 @@
+[
+  {
+    "name": "考研数一",
+    "description": "覆盖高数、线代与概率统计的核心考点，适合理工科考研系统复习。",
+    "creator": "system",
+    "disciplines": [
+      "高等数学",
+      "概率论与数理统计",
+      "线性代数"
+    ],
+    "categoryName": "考研热门"
+  },
+  {
+    "name": "计算机联考",
+    "description": "面向计算机统考复习，覆盖数据结构、操作系统、网络与组成原理。",
+    "creator": "system",
+    "disciplines": [
+      "数据结构",
+      "操作系统",
+      "计算机网络",
+      "计算机组成原理"
+    ],
+    "categoryName": "考研热门"
+  },
+  {
+    "name": "法考客观题",
+    "description": "聚焦法律职业资格考试客观题训练，适合分阶段强化记忆。",
+    "creator": "system",
+    "disciplines": [
+      "民法",
+      "刑法",
+      "行政法",
+      "商经法"
+    ],
+    "categoryName": "职业资格"
+  },
+  {
+    "name": "教资综合素质",
+    "description": "教师资格考试综合素质专项练习，覆盖职业理念与基本能力。",
+    "creator": "system",
+    "disciplines": [
+      "职业理念",
+      "教育法规",
+      "文化素养",
+      "基本能力"
+    ],
+    "categoryName": "职业资格"
+  },
+  {
+    "name": "前端进阶题库",
+    "description": "从语言基础到工程实践，帮助前端开发者查漏补缺。",
+    "creator": "system",
+    "disciplines": [
+      "JavaScript",
+      "TypeScript",
+      "Vue",
+      "浏览器原理"
+    ],
+    "categoryName": "编程开发"
+  },
+  {
+    "name": "后端工程题库",
+    "description": "适合服务端开发求职与能力提升，强调接口、数据库和架构基础。",
+    "creator": "system",
+    "disciplines": [
+      "Node.js",
+      "数据库",
+      "接口设计",
+      "系统设计"
+    ],
+    "categoryName": "编程开发"
+  },
+  {
+    "name": "初级会计实务",
+    "description": "面向初级会计备考，系统巩固会计实务与经济法基础。",
+    "creator": "system",
+    "disciplines": [
+      "会计实务",
+      "经济法基础"
+    ],
+    "categoryName": "财会金融"
+  },
+  {
+    "name": "公务员行测",
+    "description": "围绕行政职业能力测验五大模块开展限时专项训练。",
+    "creator": "system",
+    "disciplines": [
+      "言语理解",
+      "数量关系",
+      "判断推理",
+      "资料分析",
+      "常识判断"
+    ],
+    "categoryName": "公考事业"
+  },
+  {
+    "name": "英语四六级",
+    "description": "大学英语四六级刷题训练，兼顾词汇、阅读、翻译与听力基础。",
+    "creator": "system",
+    "disciplines": [
+      "核心词汇",
+      "阅读理解",
+      "翻译写作",
+      "听力训练"
+    ],
+    "categoryName": "语言提升"
+  }
+]

@@ -7,46 +7,49 @@ import {
   ArrayMinSize,
   ValidateNested,
   IsNumber,
-  IsInt,
-  Min,
   IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
+import {
+  QuestionType,
+  Answer,
+  CollectionType,
+  TestType,
+} from 'generated/prisma/enums';
 
 class OptionDto {
   @IsEnum(Answer)
-  key: Answer;
+  key!: Answer;
 
   @IsString()
   @IsNotEmpty()
-  text: string;
+  text!: string;
 }
 
 export class createQuestionDto {
   @IsEnum(QuestionType)
-  type: QuestionType;
+  type!: QuestionType;
 
   @IsString()
   @IsNotEmpty()
-  content: string;
+  content!: string;
 
   @IsArray()
   @ArrayMinSize(2)
   @ValidateNested({ each: true })
   @Type(() => OptionDto)
-  options: OptionDto[];
+  options!: OptionDto[];
 
   @IsNotEmpty()
-  answer: Answer | Answer[];
-
-  @IsString()
-  @IsNotEmpty()
-  bank: string;
+  answer!: Answer | Answer[];
 
   @IsString()
   @IsNotEmpty()
-  discipline: string;
+  bank!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  discipline!: string;
 }
 
 export class getQuestionDto {
@@ -77,24 +80,32 @@ export class getQuestionDto {
 }
 export class checkAnswerDto {
   @IsNumber()
-  userId: number;
-  @IsNumber()
-  questionId: number;
+  questionId!: number;
   @IsNotEmpty()
-  answer: Answer | Answer[];
+  answer!: Answer | Answer[];
+}
+export class submitTestDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => checkAnswerDto)
+  answerSheet!: checkAnswerDto[];
+  @IsEnum(TestType)
+  type!: TestType;
+  @IsNumber()
+  bankId!: number;
+  @IsNumber()
+  takenTime!: number;
+  @IsNumber()
+  length!: number;
 }
 export class createCollectionDto {
   @IsNumber()
-  questionId: number;
-  @IsNumber()
-  userId: number;
+  questionId!: number;
   @IsEnum(CollectionType)
   @IsOptional()
   type?: CollectionType;
 }
 export class getCollectionDto {
-  @IsNumber()
-  userId: number;
   @IsEnum(CollectionType)
   @IsOptional()
   type?: CollectionType;
@@ -116,48 +127,9 @@ export class getCollectionDto {
 }
 export class isCollectionExistDto {
   @IsNumber()
-  userId: number;
-  @IsNumber()
-  questionId: number;
-}
-export class createBankDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-  @IsString()
-  @IsNotEmpty()
-  creator: string;
-  @IsArray()
-  @ArrayMinSize(1)
-  disciplines: string[];
-}
-export class getBankDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
-  @IsString()
-  @IsOptional()
-  description?: string;
-  @IsString()
-  @IsOptional()
-  creator?: string;
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  size?: number;
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
+  questionId!: number;
 }
 export class deleteAllCollectionsDto {
-  @IsNumber()
-  userId: number;
   @IsEnum(CollectionType)
   @IsOptional()
   type?: CollectionType;
@@ -169,8 +141,6 @@ export class deleteAllCollectionsDto {
   disciplineId?: number;
 }
 export class getResolutionsDto {
-  @IsNumber()
-  userId: number;
   @IsOptional()
   @IsNumber()
   bankId?: number;

@@ -22,18 +22,13 @@ model User {
   resolutions     Resolution[]
   bankCollections BankCollection[]
   testHistories   TestHistory[]
+  documents       Document[]
 }
 
 enum QuestionType {
   SingleChoice
   MultiChoice
   TrueFalse
-}
-
-enum TestType {
-  SeqPractice
-  RandomPractice
-  Review
 }
 
 enum Answer {
@@ -66,10 +61,11 @@ model BankCategory {
 }
 
 model Discipline {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  bank      Bank[]
-  questions Question[]
+  id            Int           @id @default(autoincrement())
+  name          String        @unique
+  bank          Bank[]
+  questions     Question[]
+  testHistories TestHistory[]
 }
 
 model Question {
@@ -147,27 +143,31 @@ model BankCollection {
 }
 
 model Resolution {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  questionId  Int
-  updatedTime DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
-  question    Question @relation(fields: [questionId], references: [id])
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  questionId    Int
+  updatedTime   DateTime @default(now())
+  yourAnswer    Json
+  correctAnswer Json
+  isCorrect     Boolean
+  user          User     @relation(fields: [userId], references: [id])
+  question      Question @relation(fields: [questionId], references: [id])
 
   @@unique([userId, questionId])
 }
 
 model TestHistory {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  bankId      Int
-  type        TestType
-  accuracy    Float
-  takenTime   Int      @default(0) // 单位：ms
-  length      Int
-  createdTime DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
-  bank        Bank     @relation(fields: [bankId], references: [id])
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  bankId       Int
+  disciplineId Int
+  accuracy     Float
+  takenTime    Int        @default(0) // 单位：ms
+  length       Int
+  createdTime  DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id])
+  bank         Bank       @relation(fields: [bankId], references: [id])
+  discipline   Discipline @relation(fields: [disciplineId], references: [id])
 }
 
 model Document {
@@ -180,8 +180,10 @@ model Document {
   mimeType      String
   title         String
   content       String?
+  uploaderId    Int
   downloadCount Int              @default(0)
   createdTime   DateTime         @default(now())
+  uploader      User             @relation(fields: [uploaderId], references: [id])
   category      DocumentCategory @relation(fields: [categoryId], references: [id])
 }
 

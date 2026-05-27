@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from '@/auth/auth.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
@@ -110,13 +116,27 @@ export class UserService {
       },
     });
   }
-  getOverview(userId: number) {
+  // 获取测试记录
+  async getTestHistory(userId: number) {
+    return await this.prismaService.testHistory.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        bank: true,
+        discipline: true,
+      },
+      orderBy: { createdTime: 'desc' },
+    });
+  }
+  async getOverview(userId: number) {
     return this.prismaService.$transaction(async (tx) => {
       const testHistorySample = await tx.testHistory.findMany({
         where: { userId },
         take: 3,
         include: {
           bank: true,
+          discipline: true,
         },
         orderBy: { createdTime: 'desc' },
       });
@@ -154,6 +174,24 @@ export class UserService {
         mistakeCount,
         collectedBank,
       };
+    });
+  }
+  async deleteTestHistory(id: number, userId: number) {
+    return this.prismaService.$transaction(async (tx) => {
+      const testhistory = await tx.testHistory.findUnique({
+        where: {
+          id,
+        },
+      });
+      if (!testhistory) throw new NotFoundException('测试记录不存在');
+      if (testhistory.userId !== userId) {
+        throw new UnauthorizedException('无权删除其他用户的测试记录');
+      }
+      return tx.testHistory.delete({
+        where: {
+          id,
+        },
+      });
     });
   }
 }

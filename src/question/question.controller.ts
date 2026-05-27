@@ -11,9 +11,11 @@ import {
 import { CurrentUser } from '@/auth/current-user.decorator';
 import type { AuthUser } from '@/auth/types';
 import {
+  checkAnswerDto,
   createCollectionDto,
   createQuestionDto,
   deleteAllCollectionsDto,
+  deleteResolutionDto,
   getCollectionDto,
   getQuestionDto,
   getResolutionsDto,
@@ -79,14 +81,13 @@ export class QuestionController {
   ) {
     return this.questionService.isCollectionExist(query, user.id);
   }
-
+  @Post('check')
+  checkAnswer(@Body() body: checkAnswerDto, @CurrentUser() user: AuthUser) {
+    return this.questionService.checkAnswer(body, user.id);
+  }
   @Post('submit')
   submitTest(@Body() body: submitTestDto, @CurrentUser() user: AuthUser) {
     return this.questionService.submitTest(body, user.id);
-  }
-  @Get('testHistory')
-  getTestHistory(@CurrentUser() user: AuthUser) {
-    return this.questionService.getTestHistory(user.id);
   }
   @Get('resolution')
   getResolutions(
@@ -95,7 +96,20 @@ export class QuestionController {
   ) {
     return this.questionService.getResolutions(query, user.id);
   }
-
+  @Delete('resolution')
+  clearResolutions(
+    @Query() query: deleteResolutionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.clearResolutions(query, user.id);
+  }
+  @Delete('resolution/:id')
+  deleteResolution(
+    @Param('id', ParseIntPipe) Param: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.questionService.deleteResolution(Param, user.id);
+  }
   @Get(':id')
   getQuestion(@Param('id', ParseIntPipe) id: number) {
     return this.questionService.getQuestion(id);

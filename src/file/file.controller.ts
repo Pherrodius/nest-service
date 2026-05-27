@@ -13,6 +13,8 @@ import { extname } from 'path';
 import type { Response } from 'express';
 import { UploadFileDto } from './dto';
 import { FileService } from './file.service';
+import { CurrentUser } from '@/auth/current-user.decorator';
+import type { AuthUser } from '@/auth/types';
 @Controller('files')
 export class FileController {
   constructor(private readonly fileService: FileService) {}
@@ -32,8 +34,12 @@ export class FileController {
       },
     }),
   )
-  upload(@UploadedFile() file: Express.Multer.File, dto: UploadFileDto) {
-    return this.fileService.uploadFile(file, dto);
+  upload(
+    @UploadedFile() file: Express.Multer.File,
+    dto: UploadFileDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.fileService.uploadFile(file, dto, user.id);
   }
 
   @Get('download/:id')

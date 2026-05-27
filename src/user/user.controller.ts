@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { LoginByNameDto, LoginByPhoneDto } from './dto';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
@@ -10,9 +19,20 @@ import type { AuthUser } from '@/auth/types';
 export class UserController {
   constructor(private userService: UserService) {}
 
+  @Delete('/testhistory/:id')
+  deleteTestHistory(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.userService.deleteTestHistory(id, user.id);
+  }
   @Get()
   findAll() {
     return this.userService.findAll();
+  }
+  @Get('testHistory')
+  getTestHistory(@CurrentUser() user: AuthUser) {
+    return this.userService.getTestHistory(user.id);
   }
   @Get('overview')
   getOverview(@CurrentUser() user: AuthUser) {

@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import {
   createQuestionDto,
   getQuestionDto,
@@ -9,6 +14,7 @@ import {
   getResolutionsDto,
   isCollectionExistDto,
   submitTestDto,
+  deleteResolutionDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -228,7 +234,7 @@ export class QuestionService {
     });
   }
   // 检查答案
-  async checkAnswer(dto: checkAnswerDto, userId: number) {
+  async validateAnswer(dto: checkAnswerDto, userId: number) {
     return this.prismaService.$transaction(async (tx) => {
       const question = await tx.question.findUnique({
         where: {
@@ -241,84 +247,37 @@ export class QuestionService {
         },
       });
       if (!question) {
-        throw new Error(`Question ${dto.questionId} not found`);
+        throw new NotFoundException(`Question ${dto.questionId} not found`);
       }
-      await tx.resolution.upsert({
-        where: {
-          userId_questionId: {
-            userId,
-            questionId: question.id,
-          },
-        },
-        create: {
-          userId,
-          questionId: question.id,
-        },
-        update: {
-          updatedTime: new Date(),
-        },
-      });
+      let isCorrect = true;
+      const yourAnswer: string = JSON.stringify(dto.answer);
+      let correctAnswer: string = yourAnswer;
       if (question.type === QuestionType.SingleChoice) {
         if (question.singleAnswer?.answerKey !== dto.answer) {
-          const mistake = await tx.collection.upsert({
-            where: {
-              userId_questionId_type: {
-                userId,
-                questionId: question.id,
-                type: CollectionType.Mistake,
-              },
-            },
-            create: {
-              userId,
-              questionId: question.id,
-              type: CollectionType.Mistake,
-            },
-            update: {
-              updatedTime: new Date(),
-            },
-          });
-          return {
-            questionId: question.id,
-            yourAnswer: dto.answer,
-            correctAnswer: question.singleAnswer?.answerKey,
-            isCorrect: false,
-            mistakeId: mistake.id,
-          };
+          isCorrect = false;
+          correctAnswer = JSON.stringify(question.singleAnswer!.answerKey);
         }
       } else if (question.type === QuestionType.MultiChoice) {
         if (
           question.multiChoiceAnswer?.some(
             (a) => !dto.answer.includes(a.answerKey),
-          )
+          ) &&
+          question.multiChoiceAnswer.length === dto.answer.length
         ) {
-          const mistake = await tx.collection.upsert({
-            where: {
-              userId_questionId_type: {
-                userId,
-                questionId: question.id,
-                type: CollectionType.Mistake,
-              },
-            },
-            create: {
-              userId,
-              questionId: question.id,
-              type: CollectionType.Mistake,
-            },
-            update: {
-              updatedTime: new Date(),
-            },
-          });
-          return {
-            questionId: question.id,
-            yourAnswer: dto.answer,
-            correctAnswer: question.multiChoiceAnswer?.map((a) => a.answerKey),
-            isCorrect: false,
-            mistakeId: mistake.id,
-          };
+          isCorrect = false;
+          correctAnswer = JSON.stringify(
+            question.multiChoiceAnswer.map((a) => a.answerKey),
+          );
         }
       } else if (question.type === QuestionType.TrueFalse) {
         if (question.trueFalseAnswer?.answerKey !== dto.answer) {
-          const mistake = await tx.collection.upsert({
+          isCorrect = false;
+          correctAnswer = JSON.stringify(question.trueFalseAnswer!.answerKey);
+        }
+      }
+      if (!isCorrect) {
+        await tx.collection
+          .upsert({
             where: {
               userId_questionId_type: {
                 userId,
@@ -334,39 +293,66 @@ export class QuestionService {
             update: {
               updatedTime: new Date(),
             },
+          })
+          .catch(() => {
+            throw new BadRequestException('保存错题失败');
           });
-          return {
-            questionId: question.id,
-            yourAnswer: dto.answer,
-            correctAnswer: question.trueFalseAnswer?.answerKey,
-            isCorrect: false,
-            mistakeId: mistake.id,
-          };
-        }
       }
       return {
+        userId,
         questionId: question.id,
-        yourAnswer: dto.answer,
-        correctAnswer: dto.answer,
-        isCorrect: true,
+        yourAnswer,
+        correctAnswer,
+        isCorrect,
       };
     });
+  }
+  async checkAnswer(dto: checkAnswerDto, userId: number) {
+    const ValidationResult = await this.validateAnswer(dto, userId);
+    const { questionId, yourAnswer, correctAnswer, isCorrect } =
+      ValidationResult;
+    return await this.prismaService.resolution
+      .upsert({
+        where: {
+          userId_questionId: {
+            userId,
+            questionId,
+          },
+        },
+        create: {
+          userId,
+          questionId,
+          yourAnswer,
+          correctAnswer,
+          isCorrect,
+        },
+        update: {
+          isCorrect,
+          yourAnswer,
+          updatedTime: new Date(),
+        },
+      })
+      .catch(() => {
+        throw new BadRequestException('保存做题记录失败');
+      });
   }
   // 提交测试
   async submitTest(dto: submitTestDto, userId: number) {
     const results = await Promise.all(
-      dto.answerSheet.map((q) => this.checkAnswer(q, userId)),
-    );
+      dto.answerSheet.map((q) => this.validateAnswer(q, userId)),
+    ).catch((error) => {
+      throw new BadRequestException(error);
+    });
     const correctCount = results.filter((r) => r.isCorrect).length;
     const wrongCount = results.length - correctCount;
     const testRecord = await this.prismaService.testHistory.create({
       data: {
         userId,
         bankId: dto.bankId,
-        type: dto.type,
+        disciplineId: dto.disciplineId,
         accuracy: correctCount / dto.length,
         takenTime: dto.takenTime,
-        length,
+        length: dto.length,
       },
     });
     return {
@@ -376,25 +362,6 @@ export class QuestionService {
       results,
       testRecord,
     };
-  }
-  // 获取测试记录
-  async getTestHistory(userId: number) {
-    const testHistory = await this.prismaService.testHistory.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        bank: true,
-      },
-      orderBy: { createdTime: 'desc' },
-    });
-    const formattedHistory = testHistory.map((record) => {
-      return {
-        ...record,
-        bankName: record.bank.name,
-      };
-    });
-    return formattedHistory;
   }
   // 创建收藏
   async createCollection(dto: createCollectionDto, userId: number) {
@@ -512,6 +479,26 @@ export class QuestionService {
     });
   }
   async getResolutions(dto: getResolutionsDto, userId: number) {
+    if (!dto.detailed) {
+      return this.prismaService.resolution.findMany({
+        where: {
+          userId,
+          question: {
+            bankId: dto.bankId,
+            bank: {
+              name: dto.bankName,
+            },
+            discipline: {
+              name: {
+                contains: dto.disciplineName,
+              },
+            },
+            disciplineId: dto.disciplineId,
+          },
+        },
+        orderBy: { updatedTime: 'desc' },
+      });
+    }
     return this.prismaService.resolution.findMany({
       where: {
         userId,
@@ -527,6 +514,51 @@ export class QuestionService {
           },
           disciplineId: dto.disciplineId,
         },
+      },
+      include: {
+        question: {
+          select: {
+            content: true,
+            bank: {
+              select: {
+                name: true,
+              },
+            },
+            discipline: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { updatedTime: 'desc' },
+    });
+  }
+  async clearResolutions(dto: deleteResolutionDto, userId: number) {
+    return this.prismaService.resolution.deleteMany({
+      where: {
+        question: {
+          bankId: dto.bankId,
+          disciplineId: dto.disciplineId,
+        },
+        userId,
+      },
+    });
+  }
+  async deleteResolution(id: number, userId: number) {
+    const resolution = await this.prismaService.resolution.findUnique({
+      where: {
+        id,
+      },
+    });
+    if (!resolution) return new NotFoundException('未找到记录');
+    if (resolution.userId !== userId) {
+      throw new UnauthorizedException('无权删除其他用户的记录');
+    }
+    return this.prismaService.resolution.delete({
+      where: {
+        id,
       },
     });
   }

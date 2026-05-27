@@ -9,14 +9,30 @@ import {
   IsNumber,
   IsBoolean,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import {
-  QuestionType,
-  Answer,
-  CollectionType,
-  TestType,
-} from 'generated/prisma/enums';
+import { Transform, Type } from 'class-transformer';
+import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
+const parseBooleanQuery = ({
+  obj,
+  key,
+  value,
+}: {
+  obj: Record<string, unknown>;
+  key: string;
+  value: unknown;
+}) => {
+  const rawValue = obj[key] ?? value;
 
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return undefined;
+  }
+
+  return (
+    rawValue === true ||
+    rawValue === 'true' ||
+    rawValue === 1 ||
+    rawValue === '1'
+  );
+};
 class OptionDto {
   @IsEnum(Answer)
   key!: Answer;
@@ -89,10 +105,10 @@ export class submitTestDto {
   @ValidateNested({ each: true })
   @Type(() => checkAnswerDto)
   answerSheet!: checkAnswerDto[];
-  @IsEnum(TestType)
-  type!: TestType;
   @IsNumber()
   bankId!: number;
+  @IsNumber()
+  disciplineId!: number;
   @IsNumber()
   takenTime!: number;
   @IsNumber()
@@ -122,8 +138,9 @@ export class getCollectionDto {
   @IsEnum(QuestionType)
   questionType?: QuestionType;
   @IsOptional()
+  @Transform(parseBooleanQuery)
   @IsBoolean()
-  detailed?: false;
+  detailed?: boolean;
 }
 export class isCollectionExistDto {
   @IsNumber()
@@ -150,6 +167,18 @@ export class getResolutionsDto {
   @IsOptional()
   @IsString()
   disciplineName?: string;
+  @IsOptional()
+  @IsNumber()
+  disciplineId?: number;
+  @IsOptional()
+  @Transform(parseBooleanQuery)
+  @IsBoolean()
+  detailed?: boolean;
+}
+export class deleteResolutionDto {
+  @IsOptional()
+  @IsNumber()
+  bankId?: number;
   @IsOptional()
   @IsNumber()
   disciplineId?: number;

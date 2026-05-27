@@ -12,10 +12,15 @@ import { join } from 'path';
 export class FileService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  uploadFile(file: Express.Multer.File, dto: UploadFileDto) {
+  uploadFile(
+    file: Express.Multer.File,
+    dto: UploadFileDto,
+    uploaderId: number,
+  ) {
     try {
       return this.prismaService.document.create({
         data: {
+          uploader: { connect: { id: uploaderId } },
           filename: file.filename,
           originalName: file.originalname,
           url: `/uploads/${file.filename}`,

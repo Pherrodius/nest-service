@@ -38,6 +38,13 @@ enum Answer {
   D
 }
 
+enum SearchType {
+  Bank
+  Question
+  Document
+  User
+}
+
 model Bank {
   id              Int              @id @default(autoincrement())
   name            String           @unique

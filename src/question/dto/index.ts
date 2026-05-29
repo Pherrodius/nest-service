@@ -156,6 +156,9 @@ export class deleteAllCollectionsDto {
   @IsOptional()
   @IsNumber()
   disciplineId?: number;
+  @IsOptional()
+  @IsNumber()
+  questionId?: number;
 }
 export class getResolutionsDto {
   @IsOptional()

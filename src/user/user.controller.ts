@@ -15,6 +15,7 @@ import { ParseIntPipe } from '@nestjs/common';
 import { Public } from '@/auth/public.decorator';
 import { CurrentUser } from '@/auth/current-user.decorator';
 import type { AuthUser } from '@/auth/types';
+import { CollectionType } from 'generated/prisma/enums';
 @Controller('user')
 export class UserController {
   constructor(private userService: UserService) {}
@@ -30,6 +31,17 @@ export class UserController {
   findAll() {
     return this.userService.findAll();
   }
+  @Get('collections')
+  getGroupedCollections(
+    @Query() query: { type: CollectionType },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.userService.getGroupedCollection(query.type, user.id);
+  }
+  @Get('banks')
+  getMyBanks(@CurrentUser() user: AuthUser) {
+    return this.userService.getMyBank(user.id);
+  }
   @Get('testHistory')
   getTestHistory(@CurrentUser() user: AuthUser) {
     return this.userService.getTestHistory(user.id);
@@ -42,7 +54,6 @@ export class UserController {
   search(@Query('id', ParseIntPipe) id: number) {
     return this.userService.search(id);
   }
-
   @Post()
   @Public()
   create(@Body() body: CreateUserDto) {

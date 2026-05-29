@@ -7,9 +7,10 @@ import { QuestionModule } from './question/question.module';
 import { BankModule } from './bank/bank.module';
 import { AuthModule } from './auth/auth.module';
 import { FileModule } from './file/file.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UserModule, QuestionModule, BankModule, FileModule],
+  imports: [PrismaModule, AuthModule, UserModule, QuestionModule, BankModule, FileModule, SearchModule],
   controllers: [AppController],
   providers: [AppService],
 })

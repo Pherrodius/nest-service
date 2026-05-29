@@ -201,8 +201,8 @@ export class QuestionService {
     };
   }
   // 获取问题列表
-  getQuestions(dto: getQuestionDto) {
-    return this.prismaService.question.findMany({
+  async getQuestions(dto: getQuestionDto) {
+    const questions = await this.prismaService.question.findMany({
       where: {
         type: dto.type,
         content: { contains: dto.content },
@@ -214,8 +214,9 @@ export class QuestionService {
       include: {
         options: true,
       },
-      take: dto.number,
     });
+    if (!dto.number) return questions;
+    return questions.sort(() => Math.random() - 0.5).slice(0, dto.number);
   }
   // 获取问题
   getQuestion(id: number) {
@@ -261,8 +262,8 @@ export class QuestionService {
         if (
           question.multiChoiceAnswer?.some(
             (a) => !dto.answer.includes(a.answerKey),
-          ) &&
-          question.multiChoiceAnswer.length === dto.answer.length
+          ) ||
+          question.multiChoiceAnswer.length !== dto.answer.length
         ) {
           isCorrect = false;
           correctAnswer = JSON.stringify(
@@ -472,6 +473,7 @@ export class QuestionService {
         userId,
         type: dto.type,
         question: {
+          id: dto.questionId,
           bankId: dto.bankId,
           disciplineId: dto.disciplineId,
         },

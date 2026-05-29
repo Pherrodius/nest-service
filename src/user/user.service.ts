@@ -194,4 +194,150 @@ export class UserService {
       });
     });
   }
+  getGroupedCollection(type: CollectionType, userId: number) {
+    return this.prismaService.bank.findMany({
+      where: {
+        questions: {
+          some: {
+            collected: {
+              some: {
+                userId,
+                type,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        creator: true,
+        questions: {
+          where: {
+            collected: {
+              some: {
+                userId,
+                type,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+  async getMyBank(userId: number) {
+    return this.prismaService.$transaction(async (tx) => {
+      const practicedbanks = await tx.bank.findMany({
+        where: {
+          questions: {
+            some: {
+              resolutions: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        },
+        include: {
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+          questions: {
+            where: {
+              resolutions: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        },
+      });
+      const collectedBanks = await tx.bank.findMany({
+        where: {
+          bankCollections: {
+            some: {
+              userId,
+            },
+          },
+        },
+        include: {
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+          questions: {
+            where: {
+              resolutions: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        },
+      });
+      const createdBanks = await tx.bank.findMany({
+        where: {
+          creatorId: userId,
+        },
+        include: {
+          _count: {
+            select: {
+              questions: true,
+            },
+          },
+          questions: {
+            where: {
+              resolutions: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          },
+        },
+      });
+      const bankMap = new Map<
+        number,
+        Omit<(typeof practicedbanks)[number], 'questions' | '_count'> & {
+          count: number;
+          progress: number;
+          collected: boolean;
+          created: boolean;
+        }
+      >();
+      const mergeBank = (
+        { questions, _count, ...bank }: (typeof practicedbanks)[number],
+        flags: {
+          collected?: boolean;
+          created?: boolean;
+        },
+      ) => {
+        const existed = bankMap.get(bank.id);
+
+        if (existed) {
+          existed.collected ||= !!flags.collected;
+          existed.created ||= !!flags.created;
+          return;
+        }
+
+        bankMap.set(bank.id, {
+          ...bank,
+          count: _count.questions,
+          progress: questions.length,
+          collected: !!flags.collected,
+          created: !!flags.created,
+        });
+      };
+
+      practicedbanks.forEach((bank) => mergeBank(bank, {}));
+      collectedBanks.forEach((bank) => mergeBank(bank, { collected: true }));
+      createdBanks.forEach((bank) => mergeBank(bank, { created: true }));
+
+      return [...bankMap.values()];
+    });
+  }
 }

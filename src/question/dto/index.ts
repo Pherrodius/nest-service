@@ -60,14 +60,48 @@ export class createQuestionDto {
   answer!: Answer | Answer[];
 
   @IsString()
-  @IsNotEmpty()
-  bank!: string;
-
+  @IsOptional()
+  bank?: string;
+  @IsNumber()
+  @IsOptional()
+  bankId?: number;
   @IsString()
-  @IsNotEmpty()
-  discipline!: string;
-}
+  @IsOptional()
+  discipline?: string;
+  @IsNumber()
+  @IsOptional()
+  disciplineId?: number;
+  @IsOptional()
+  @IsString()
+  explanation?: string;
 
+  @IsOptional()
+  @IsNumber()
+  riskLevel?: number;
+}
+export class UpdateQuestionDto {
+  @IsString()
+  content!: string;
+  @ArrayMinSize(2)
+  @ValidateNested({ each: true })
+  @Type(() => OptionDto)
+  options!: OptionDto[];
+  @IsOptional()
+  @IsString()
+  explanation?: string;
+  @IsOptional()
+  @IsEnum(Answer)
+  singleAnswer?: Answer;
+  @IsOptional()
+  @IsEnum(Answer)
+  trueFalseAnswer?: Answer;
+  @IsOptional()
+  @IsArray()
+  multiChoiceAnswer?: Answer[];
+  @IsOptional()
+  @IsNumber()
+  riskLevel?: number;
+}
 export class getQuestionDto {
   @IsEnum(CollectionType)
   @IsOptional()

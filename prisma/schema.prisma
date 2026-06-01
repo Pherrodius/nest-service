@@ -17,12 +17,22 @@ model User {
   phone           String           @unique
   password        String
   createdTime     DateTime         @default(now())
+  avatarUrl       String?
+  introduction    String?
+  direction       String?
+  area            String?
+  gender          Gender?
   collect         Collection[]
   banks           Bank[]
   resolutions     Resolution[]
   bankCollections BankCollection[]
   testHistories   TestHistory[]
   documents       Document[]
+}
+
+enum Gender {
+  男
+  女
 }
 
 enum QuestionType {
@@ -82,13 +92,15 @@ model Question {
   options           Option[]
   bankId            Int
   disciplineId      Int
+  riskLevel         Int                 @default(2)
+  explanation       String?
   createdTime       DateTime            @default(now())
   singleAnswer      SingleAnswer?
   multiChoiceAnswer MultiChoiceAnswer[]
   trueFalseAnswer   TrueFalseAnswer?
   collected         Collection[]
-  bank              Bank                @relation(fields: [bankId], references: [id])
-  discipline        Discipline          @relation(fields: [disciplineId], references: [id])
+  bank              Bank                @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  discipline        Discipline          @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
   resolutions       Resolution[]
 }
 
@@ -97,7 +109,7 @@ model Option {
   key        Answer
   text       String
   questionId Int
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([questionId, key])
 }
@@ -105,20 +117,20 @@ model Option {
 model SingleAnswer {
   questionId Int      @id
   answerKey  Answer
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model MultiChoiceAnswer {
   id         Int      @id @default(autoincrement())
   questionId Int
   answerKey  Answer
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model TrueFalseAnswer {
   questionId Int      @id
   answerKey  Answer
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 enum CollectionType {
@@ -132,8 +144,8 @@ model Collection {
   questionId  Int
   updatedTime DateTime       @default(now())
   type        CollectionType @default(Note)
-  user        User           @relation(fields: [userId], references: [id])
-  question    Question       @relation(fields: [questionId], references: [id])
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question    Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, questionId, type])
 }
@@ -143,8 +155,8 @@ model BankCollection {
   userId      Int
   bankId      Int
   updatedTime DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
-  bank        Bank     @relation(fields: [bankId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bank        Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bankId])
 }
@@ -157,8 +169,8 @@ model Resolution {
   yourAnswer    Json
   correctAnswer Json
   isCorrect     Boolean
-  user          User     @relation(fields: [userId], references: [id])
-  question      Question @relation(fields: [questionId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question      Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, questionId])
 }
@@ -172,30 +184,21 @@ model TestHistory {
   takenTime    Int        @default(0) // 单位：ms
   length       Int
   createdTime  DateTime   @default(now())
-  user         User       @relation(fields: [userId], references: [id])
-  bank         Bank       @relation(fields: [bankId], references: [id])
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bank         Bank       @relation(fields: [bankId], references: [id], onDelete: Cascade)
   discipline   Discipline @relation(fields: [disciplineId], references: [id])
 }
 
 model Document {
-  id            Int              @id @default(autoincrement())
-  filename      String           @unique
+  id            Int      @id @default(autoincrement())
+  filename      String   @unique
   originalName  String
   url           String
   size          Int
-  categoryId    Int
   mimeType      String
-  title         String
   content       String?
   uploaderId    Int
-  downloadCount Int              @default(0)
-  createdTime   DateTime         @default(now())
-  uploader      User             @relation(fields: [uploaderId], references: [id])
-  category      DocumentCategory @relation(fields: [categoryId], references: [id])
-}
-
-model DocumentCategory {
-  id        Int        @id @default(autoincrement())
-  name      String     @unique
-  documents Document[]
+  downloadCount Int      @default(0)
+  createdTime   DateTime @default(now())
+  uploader      User     @relation(fields: [uploaderId], references: [id])
 }

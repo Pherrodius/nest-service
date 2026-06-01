@@ -72,6 +72,14 @@ export class BankController {
   ) {
     return this.bankService.isCollected(id, user.id);
   }
+  @Get('edit/:bankId')
+  getDetailedQuestions(
+    @Param('bankId', ParseIntPipe) bankId: number,
+    @Query('disciplineId', ParseIntPipe) disciplineId: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.bankService.getDetailedQuestions(bankId, disciplineId, user.id);
+  }
   // 获取题库详情
   @Public()
   @Get(':id')

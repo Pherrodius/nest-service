@@ -6,6 +6,9 @@ import {
   Get,
   Param,
   Res,
+  Body,
+  Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -15,20 +18,34 @@ import { UploadFileDto } from './dto';
 import { FileService } from './file.service';
 import { CurrentUser } from '@/auth/current-user.decorator';
 import type { AuthUser } from '@/auth/types';
+import { Public } from '@/auth/public.decorator';
+import { decodeOriginalName } from './utils';
 @Controller('files')
 export class FileController {
   constructor(private readonly fileService: FileService) {}
+  @Get()
+  getFiles() {
+    return this.fileService.getFiles();
+  }
 
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads',
+        destination: './uploads/docs',
         filename: (req, file, cb) => {
+          const originalName = decodeOriginalName(file.originalname);
           const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, uniqueName + extname(file.originalname));
+          cb(null, uniqueName + extname(originalName));
         },
       }),
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('application/')) {
+          cb(new BadRequestException('只能上传文件'), false);
+          return;
+        }
+        cb(null, true);
+      },
       limits: {
         fileSize: 1024 * 1024 * 10, // 10MB
       },
@@ -36,15 +53,20 @@ export class FileController {
   )
   upload(
     @UploadedFile() file: Express.Multer.File,
-    dto: UploadFileDto,
+    @Body() dto: UploadFileDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.fileService.uploadFile(file, dto, user.id);
   }
-
+  @Public()
   @Get('download/:id')
   async download(@Param('id') id: number, @Res() res: Response) {
     const fileUrl = await this.fileService.downloadFile(id);
     return res.download(fileUrl);
+  }
+
+  @Delete('delete/:id')
+  async delete(@Param('id') id: number, @CurrentUser() user: AuthUser) {
+    return this.fileService.deleteFile(id, user.id);
   }
 }

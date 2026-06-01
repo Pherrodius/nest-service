@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { createBankDto, getBankDto } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
@@ -41,7 +45,25 @@ export class BankService {
         name: true,
         description: true,
         createdTime: true,
-        creator: { select: { id: true, name: true } },
+        creatorId: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            avatarUrl: true,
+            introduction: true,
+            direction: true,
+            area: true,
+            gender: true,
+            _count: {
+              select: {
+                banks: true,
+                documents: true,
+              },
+            },
+          },
+        },
         category: { select: { id: true, name: true } },
         disciplines: {
           select: { id: true, name: true },
@@ -186,5 +208,32 @@ export class BankService {
         },
       });
     }
+  }
+  async getDetailedQuestions(
+    bankId: number,
+    disciplineId: number,
+    userId: number,
+  ) {
+    const bank = await this.prismaService.bank.findUnique({
+      where: {
+        id: bankId,
+      },
+    });
+    if (!bank) throw new NotFoundException('题库不存在');
+    if (bank.creatorId !== userId) throw new UnauthorizedException('无权查看');
+    return this.prismaService.question.findMany({
+      where: {
+        bankId,
+        disciplineId,
+      },
+      include: {
+        bank: true,
+        discipline: true,
+        options: true,
+        singleAnswer: true,
+        multiChoiceAnswer: true,
+        trueFalseAnswer: true,
+      },
+    });
   }
 }

@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '@/auth/current-user.decorator';
@@ -21,6 +22,7 @@ import {
   getResolutionsDto,
   isCollectionExistDto,
   submitTestDto,
+  UpdateQuestionDto,
 } from './dto';
 import { QuestionService } from './question.service';
 
@@ -36,12 +38,21 @@ export class QuestionController {
 
     return this.questionService.createQuestion(body);
   }
-
+  @Delete('/delete/:id')
+  deleteQuestion(@Param('id', ParseIntPipe) id: number) {
+    return this.questionService.deleteQuestion(id);
+  }
   @Get()
   getQuestions(@Query() query: getQuestionDto) {
     return this.questionService.getQuestions(query);
   }
-
+  @Put('edit/:id')
+  editQuestion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateQuestionDto,
+  ) {
+    return this.questionService.editQuestion(id, body);
+  }
   @Post('collection')
   createCollection(
     @Body() body: createCollectionDto,

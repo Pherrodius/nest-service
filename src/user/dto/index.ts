@@ -4,6 +4,7 @@ import {
   MinLength,
   MaxLength,
   Length,
+  IsIn,
 } from 'class-validator';
 export class CreateUserDto {
   @IsString()
@@ -50,4 +51,27 @@ export class UpdateUserDto {
   @MinLength(6)
   @MaxLength(12)
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  introduction?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  direction?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  area?: string;
+
+  @IsOptional()
+  @IsIn(['男', '女'])
+  gender?: '男' | '女' | null;
 }

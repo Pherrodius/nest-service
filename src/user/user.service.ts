@@ -22,6 +22,18 @@ export class UserService {
     private authService: AuthService,
   ) {}
 
+  private readonly userProfileSelect = {
+    id: true,
+    name: true,
+    phone: true,
+    createdTime: true,
+    avatarUrl: true,
+    introduction: true,
+    direction: true,
+    area: true,
+    gender: true,
+  };
+
   create(createUserDto: CreateUserDto) {
     if (createUserDto.password !== createUserDto.confirmPassword) {
       throw new HttpException('两次输入的密码不一致', HttpStatus.BAD_REQUEST);
@@ -108,12 +120,30 @@ export class UserService {
     return this.prismaService.user.update({
       where: { id },
       data: updateUserDto,
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        createdTime: true,
-      },
+      select: this.userProfileSelect,
+    });
+  }
+
+  getProfile(userId: number) {
+    return this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: this.userProfileSelect,
+    });
+  }
+
+  updateProfile(userId: number, updateUserDto: UpdateUserDto) {
+    return this.prismaService.user.update({
+      where: { id: userId },
+      data: updateUserDto,
+      select: this.userProfileSelect,
+    });
+  }
+
+  updateAvatar(userId: number, avatarUrl: string) {
+    return this.prismaService.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: this.userProfileSelect,
     });
   }
   // 获取测试记录
@@ -338,6 +368,13 @@ export class UserService {
       createdBanks.forEach((bank) => mergeBank(bank, { created: true }));
 
       return [...bankMap.values()];
+    });
+  }
+  async getMyFiles(userId: number) {
+    return this.prismaService.document.findMany({
+      where: {
+        uploaderId: userId,
+      },
     });
   }
 }

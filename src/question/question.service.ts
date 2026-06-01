@@ -15,6 +15,7 @@ import {
   isCollectionExistDto,
   submitTestDto,
   deleteResolutionDto,
+  UpdateQuestionDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
@@ -65,14 +66,18 @@ export class QuestionService {
         data: {
           type: dto.type,
           content: dto.content,
+          riskLevel: dto.riskLevel,
+          explanation: dto.explanation,
           bank: {
             connect: {
               name: dto.bank,
+              id: dto.bankId,
             },
           },
           discipline: {
             connect: {
               name: dto.discipline,
+              id: dto.disciplineId,
             },
           },
         },
@@ -199,6 +204,74 @@ export class QuestionService {
       failed: invalidQuestions.length,
       questions: results,
     };
+  }
+  // 删除问题
+  async deleteQuestion(id: number) {
+    return this.prismaService.question.delete({
+      where: {
+        id,
+      },
+    });
+  }
+  // 编辑问题
+  async editQuestion(id: number, dto: UpdateQuestionDto) {
+    console.log(dto);
+    if (dto.singleAnswer) {
+      await this.prismaService.singleAnswer.deleteMany({
+        where: {
+          questionId: id,
+        },
+      });
+      await this.prismaService.singleAnswer.create({
+        data: {
+          answerKey: dto.singleAnswer,
+          questionId: id,
+        },
+      });
+    } else if (dto.multiChoiceAnswer) {
+      await this.prismaService.multiChoiceAnswer.deleteMany({
+        where: {
+          questionId: id,
+        },
+      });
+      await this.prismaService.multiChoiceAnswer.createMany({
+        data: dto.multiChoiceAnswer.map((a) => ({
+          answerKey: a,
+          questionId: id,
+        })),
+      });
+    } else if (dto.trueFalseAnswer) {
+      await this.prismaService.trueFalseAnswer.deleteMany({
+        where: {
+          questionId: id,
+        },
+      });
+      await this.prismaService.trueFalseAnswer.create({
+        data: {
+          answerKey: dto.trueFalseAnswer,
+          questionId: id,
+        },
+      });
+    }
+    return await this.prismaService.question.update({
+      where: {
+        id,
+      },
+      data: {
+        riskLevel: dto.riskLevel,
+        content: dto.content,
+        explanation: dto.explanation,
+        options: {
+          deleteMany: {},
+          createMany: {
+            data: dto.options.map((o) => ({
+              key: o.key,
+              text: o.text,
+            })),
+          },
+        },
+      },
+    });
   }
   // 获取问题列表
   async getQuestions(dto: getQuestionDto) {

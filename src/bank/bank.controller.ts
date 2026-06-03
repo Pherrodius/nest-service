@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Delete,
+  Put,
 } from '@nestjs/common';
 import { BankService } from './bank.service';
 import { createBankDto, getBankDto } from './dto';
@@ -20,8 +21,27 @@ export class BankController {
 
   // 创建题库
   @Post('create')
-  createBank(@Body() body: createBankDto) {
-    return this.bankService.createBank(body);
+  createBank(@Body() body: createBankDto, @CurrentUser() user: AuthUser) {
+    return this.bankService.createBank(body, user.id);
+  }
+  @Put('update/:id')
+  updateBank(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: createBankDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.bankService.updateBank(id, body, user.id);
+  }
+  @Get('mine')
+  getMyBanks(@CurrentUser() user: AuthUser) {
+    return this.bankService.getMyBanks(user.id);
+  }
+  @Delete('delete/:id')
+  deleteBank(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.bankService.deleteBank(id, user.id);
   }
   // 获取题库列表
   @Get('')

@@ -9,14 +9,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class BankService {
   constructor(private prismaService: PrismaService) {}
   // 创建题库
-  async createBank(dto: createBankDto) {
+  async createBank(dto: createBankDto, creatorId: number) {
     return this.prismaService.$transaction(async (tx) => {
       await this.createDiscipline(dto.disciplines);
       return tx.bank.create({
         data: {
           name: dto.name,
           description: dto.description,
-          creator: { connect: { name: dto.creator } },
+          creator: { connect: { id: creatorId } },
           disciplines: {
             connect: dto.disciplines.map((d) => ({ name: d })),
           },
@@ -32,6 +32,48 @@ export class BankService {
               : undefined,
         },
       });
+    });
+  }
+  async updateBank(id: number, dto: createBankDto, userId: number) {
+    return this.prismaService.$transaction(async (tx) => {
+      const bank = await tx.bank.findUnique({ where: { id } });
+      if (!bank) throw new NotFoundException('题库不存在');
+      if (bank.creatorId !== userId)
+        throw new UnauthorizedException('无权修改');
+      await this.createDiscipline(dto.disciplines);
+      return tx.bank.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          disciplines: {
+            set: dto.disciplines.map((d) => ({ name: d })),
+          },
+          category: dto.categoryName
+            ? {
+                connectOrCreate: {
+                  where: { name: dto.categoryName },
+                  create: { name: dto.categoryName },
+                },
+              }
+            : undefined,
+        },
+      });
+    });
+  }
+  async getMyBanks(userId: number) {
+    return this.prismaService.bank.findMany({
+      where: { creatorId: userId },
+      include: { disciplines: true },
+    });
+  }
+  async deleteBank(id: number, userId: number) {
+    return this.prismaService.$transaction(async (tx) => {
+      const bank = await tx.bank.findUnique({ where: { id } });
+      if (!bank) throw new NotFoundException('题库不存在');
+      if (bank.creatorId !== userId)
+        throw new UnauthorizedException('无权删除');
+      return tx.bank.delete({ where: { id } });
     });
   }
   // 获取题库详情

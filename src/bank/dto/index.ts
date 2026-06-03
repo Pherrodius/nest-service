@@ -14,9 +14,6 @@ export class createBankDto {
   @IsString()
   @IsNotEmpty()
   description!: string;
-  @IsString()
-  @IsNotEmpty()
-  creator!: string;
   @IsArray()
   @ArrayMinSize(1)
   disciplines!: string[];

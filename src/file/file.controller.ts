@@ -9,12 +9,13 @@ import {
   Body,
   Delete,
   BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import type { Response } from 'express';
-import { UploadFileDto } from './dto';
+import { LLMAnalysisFileDto, UploadFileDto } from './dto';
 import { FileService } from './file.service';
 import { CurrentUser } from '@/auth/current-user.decorator';
 import type { AuthUser } from '@/auth/types';
@@ -28,6 +29,14 @@ export class FileController {
     return this.fileService.getFiles();
   }
 
+  @Post('llm/:id')
+  LLMAnalysisFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: LLMAnalysisFileDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.fileService.LLMAnalysisFile(id, dto, user.id);
+  }
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {

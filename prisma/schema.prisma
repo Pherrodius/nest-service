@@ -55,6 +55,13 @@ enum SearchType {
   User
 }
 
+enum DocumentStatus {
+  Uploaded
+  Pending
+  Resolved
+  Rejected
+}
+
 model Bank {
   id              Int              @id @default(autoincrement())
   name            String           @unique
@@ -190,15 +197,16 @@ model TestHistory {
 }
 
 model Document {
-  id            Int      @id @default(autoincrement())
-  filename      String   @unique
+  id            Int            @id @default(autoincrement())
+  filename      String         @unique
   originalName  String
   url           String
   size          Int
   mimeType      String
   content       String?
+  status        DocumentStatus @default(Uploaded)
   uploaderId    Int
-  downloadCount Int      @default(0)
-  createdTime   DateTime @default(now())
-  uploader      User     @relation(fields: [uploaderId], references: [id])
+  downloadCount Int            @default(0)
+  createdTime   DateTime       @default(now())
+  uploader      User           @relation(fields: [uploaderId], references: [id])
 }

@@ -275,6 +275,7 @@ export class BankService {
         singleAnswer: true,
         multiChoiceAnswer: true,
         trueFalseAnswer: true,
+        subjectiveAnswer: true,
       },
     });
   }

@@ -57,6 +57,7 @@ export class UserService {
       name: string;
       phone: string;
       password: string;
+      avatarUrl?: string | null;
     } | null;
     if ('phone' in loginDto) {
       user = await this.prismaService.user.findUnique({
@@ -88,6 +89,7 @@ export class UserService {
 
     return {
       ...authUser,
+      avatarUrl: user.avatarUrl,
       accessToken: await this.authService.signToken(authUser),
       tokenType: 'Bearer',
     };

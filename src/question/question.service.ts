@@ -19,8 +19,12 @@ import {
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionType, Answer, CollectionType } from 'generated/prisma/enums';
+import { LlmService } from '@/llm/llm.service';
 
 const isValid = (q: createQuestionDto) => {
+  if (q.type === QuestionType.Subjective) {
+    return typeof q.answer === 'string' && q.answer.trim().length > 0;
+  }
   if (!q.options || q.options.length === 0) return false;
 
   const optionKeys = q.options.map((o) => o.key);
@@ -37,7 +41,7 @@ const isValid = (q: createQuestionDto) => {
   }
 
   if (q.type === QuestionType.SingleChoice) {
-    return !Array.isArray(q.answer) && optionKeys.includes(q.answer);
+    return !Array.isArray(q.answer) && optionKeys.includes(q.answer as Answer);
   }
 
   if (q.type === QuestionType.MultiChoice) {
@@ -53,12 +57,17 @@ const isValid = (q: createQuestionDto) => {
 
 @Injectable()
 export class QuestionService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(
+    private prismaService: PrismaService,
+    private llmService: LlmService,
+  ) {}
 
   // 创建问题
   async createQuestion(dto: createQuestionDto) {
     if (!isValid(dto)) {
-      throw new Error(`Invalid question :${dto.content.slice(0, 10)}...`);
+      throw new BadRequestException(
+        `Invalid question :${dto.content.slice(0, 10)}...`,
+      );
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -82,27 +91,28 @@ export class QuestionService {
           },
         },
       });
-      await tx.option.createMany({
-        data: dto.options.map((o) => ({
-          key: o.key,
-          text: o.text,
-          questionId: question.id,
-        })),
-      });
+      if (dto.options?.length)
+        await tx.option.createMany({
+          data: dto.options.map((o) => ({
+            key: o.key,
+            text: o.text,
+            questionId: question.id,
+          })),
+        });
       if (dto.type === QuestionType.SingleChoice) {
         if (Array.isArray(dto.answer))
-          throw new Error(
+          throw new BadRequestException(
             `question ${dto.content.slice(0, 10)}... should have only one answer`,
           );
         await tx.singleAnswer.create({
           data: {
-            answerKey: dto.answer,
+            answerKey: dto.answer as Answer,
             questionId: question.id,
           },
         });
       } else if (dto.type === QuestionType.MultiChoice) {
         if (!Array.isArray(dto.answer))
-          throw new Error(
+          throw new BadRequestException(
             `question ${dto.content.slice(0, 10)}... should have 2+ answers`,
           );
         await tx.multiChoiceAnswer.createMany({
@@ -113,12 +123,19 @@ export class QuestionService {
         });
       } else if (dto.type === QuestionType.TrueFalse) {
         if (Array.isArray(dto.answer))
-          throw new Error(
+          throw new BadRequestException(
             `question ${dto.content.slice(0, 10)}... should have only one answer`,
           );
         await tx.trueFalseAnswer.create({
           data: {
-            answerKey: dto.answer,
+            answerKey: dto.answer as Answer,
+            questionId: question.id,
+          },
+        });
+      } else if (dto.type === QuestionType.Subjective) {
+        await tx.subjectiveAnswer.create({
+          data: {
+            reference: dto.answer as string,
             questionId: question.id,
           },
         });
@@ -142,6 +159,8 @@ export class QuestionService {
             data: {
               type: q.type,
               content: q.content,
+              riskLevel: q.riskLevel,
+              explanation: q.explanation,
               bank: {
                 connect: {
                   name: q.bank,
@@ -155,13 +174,14 @@ export class QuestionService {
             },
           });
 
-          await tx.option.createMany({
-            data: q.options.map((o) => ({
-              key: o.key,
-              text: o.text,
-              questionId: question.id,
-            })),
-          });
+          if (q.options?.length)
+            await tx.option.createMany({
+              data: q.options.map((o) => ({
+                key: o.key,
+                text: o.text,
+                questionId: question.id,
+              })),
+            });
 
           if (q.type === QuestionType.SingleChoice) {
             await tx.singleAnswer.create({
@@ -181,6 +201,13 @@ export class QuestionService {
             await tx.trueFalseAnswer.create({
               data: {
                 answerKey: q.answer as Answer,
+                questionId: question.id,
+              },
+            });
+          } else if (q.type === QuestionType.Subjective) {
+            await tx.subjectiveAnswer.create({
+              data: {
+                reference: q.answer as string,
                 questionId: question.id,
               },
             });
@@ -252,6 +279,12 @@ export class QuestionService {
           questionId: id,
         },
       });
+    } else if (dto.subjectiveAnswer !== undefined) {
+      await this.prismaService.subjectiveAnswer.upsert({
+        where: { questionId: id },
+        create: { questionId: id, reference: dto.subjectiveAnswer },
+        update: { reference: dto.subjectiveAnswer },
+      });
     }
     return await this.prismaService.question.update({
       where: {
@@ -261,15 +294,17 @@ export class QuestionService {
         riskLevel: dto.riskLevel,
         content: dto.content,
         explanation: dto.explanation,
-        options: {
-          deleteMany: {},
-          createMany: {
-            data: dto.options.map((o) => ({
-              key: o.key,
-              text: o.text,
-            })),
-          },
-        },
+        options: dto.options
+          ? {
+              deleteMany: {},
+              createMany: {
+                data: dto.options.map((o) => ({
+                  key: o.key,
+                  text: o.text,
+                })),
+              },
+            }
+          : undefined,
       },
     });
   }
@@ -304,82 +339,119 @@ export class QuestionService {
         singleAnswer: true,
         multiChoiceAnswer: true,
         trueFalseAnswer: true,
+        subjectiveAnswer: true,
       },
     });
   }
   // 检查答案
   async validateAnswer(dto: checkAnswerDto, userId: number) {
-    return this.prismaService.$transaction(async (tx) => {
-      const question = await tx.question.findUnique({
-        where: {
-          id: dto.questionId,
-        },
-        include: {
-          singleAnswer: true,
-          multiChoiceAnswer: true,
-          trueFalseAnswer: true,
-        },
-      });
-      if (!question) {
-        throw new NotFoundException(`Question ${dto.questionId} not found`);
-      }
-      let isCorrect = true;
-      const yourAnswer: string = JSON.stringify(dto.answer);
-      let correctAnswer: string = yourAnswer;
-      if (question.type === QuestionType.SingleChoice) {
-        if (question.singleAnswer?.answerKey !== dto.answer) {
-          isCorrect = false;
-          correctAnswer = JSON.stringify(question.singleAnswer!.answerKey);
+    return this.prismaService.$transaction(
+      async (tx) => {
+        const question = await tx.question.findUnique({
+          where: {
+            id: dto.questionId,
+          },
+          include: {
+            singleAnswer: true,
+            multiChoiceAnswer: true,
+            trueFalseAnswer: true,
+            subjectiveAnswer: true,
+          },
+        });
+        if (!question) {
+          throw new NotFoundException(`Question ${dto.questionId} not found`);
         }
-      } else if (question.type === QuestionType.MultiChoice) {
-        if (
-          question.multiChoiceAnswer?.some(
-            (a) => !dto.answer.includes(a.answerKey),
-          ) ||
-          question.multiChoiceAnswer.length !== dto.answer.length
-        ) {
-          isCorrect = false;
-          correctAnswer = JSON.stringify(
-            question.multiChoiceAnswer.map((a) => a.answerKey),
-          );
+        let isCorrect = true;
+        const yourAnswer: string = JSON.stringify(dto.answer);
+        let correctAnswer: string = yourAnswer;
+        if (question.type === QuestionType.SingleChoice) {
+          if (question.singleAnswer?.answerKey !== dto.answer) {
+            isCorrect = false;
+            correctAnswer = JSON.stringify(question.singleAnswer!.answerKey);
+          }
+        } else if (question.type === QuestionType.MultiChoice) {
+          if (
+            question.multiChoiceAnswer?.some(
+              (a) => !dto.answer.includes(a.answerKey),
+            ) ||
+            question.multiChoiceAnswer.length !== dto.answer.length
+          ) {
+            isCorrect = false;
+            correctAnswer = JSON.stringify(
+              question.multiChoiceAnswer.map((a) => a.answerKey),
+            );
+          }
+        } else if (question.type === QuestionType.TrueFalse) {
+          if (question.trueFalseAnswer?.answerKey !== dto.answer) {
+            isCorrect = false;
+            correctAnswer = JSON.stringify(question.trueFalseAnswer!.answerKey);
+          }
+        } else if (question.type === QuestionType.Subjective) {
+          if (typeof dto.answer !== 'string') {
+            throw new BadRequestException('主观题答案必须是文本');
+          }
+          const reference = question.subjectiveAnswer?.reference ?? '';
+          correctAnswer = JSON.stringify(reference);
+          const response = await this.llmService.chat.completions.create({
+            model: 'deepseek-v4-pro',
+            response_format: { type: 'json_object' },
+            stream: false,
+            messages: [
+              {
+                role: 'system',
+                content:
+                  '你是一个专业的刷题网站AI助手,你将收到用户返回的主观题题干，用户答案和参考答案，你需要结合三者和你自身的知识判断用户答案是否正确。你必须返回一个JSON对象，其中仅包含一个isCorrect字段，表示用户答案是否正确。示例为：{"isCorrect":true}。',
+              },
+              {
+                role: 'user',
+                content: `问题题干:${question.content}\n用户答案:${dto.answer}\n参考答案:${reference}`,
+              },
+            ],
+          });
+          try {
+            const result = JSON.parse(
+              response.choices[0]?.message.content ?? '{}',
+            ) as {
+              isCorrect?: boolean;
+            };
+            isCorrect = result.isCorrect === true;
+          } catch {
+            throw new BadRequestException('大模型批改结果格式错误');
+          }
         }
-      } else if (question.type === QuestionType.TrueFalse) {
-        if (question.trueFalseAnswer?.answerKey !== dto.answer) {
-          isCorrect = false;
-          correctAnswer = JSON.stringify(question.trueFalseAnswer!.answerKey);
-        }
-      }
-      if (!isCorrect) {
-        await tx.collection
-          .upsert({
-            where: {
-              userId_questionId_type: {
+        if (!isCorrect) {
+          await tx.collection
+            .upsert({
+              where: {
+                userId_questionId_type: {
+                  userId,
+                  questionId: question.id,
+                  type: CollectionType.Mistake,
+                },
+              },
+              create: {
                 userId,
                 questionId: question.id,
                 type: CollectionType.Mistake,
               },
-            },
-            create: {
-              userId,
-              questionId: question.id,
-              type: CollectionType.Mistake,
-            },
-            update: {
-              updatedTime: new Date(),
-            },
-          })
-          .catch(() => {
-            throw new BadRequestException('保存错题失败');
-          });
-      }
-      return {
-        userId,
-        questionId: question.id,
-        yourAnswer,
-        correctAnswer,
-        isCorrect,
-      };
-    });
+              update: {
+                updatedTime: new Date(),
+              },
+            })
+            .catch(() => {
+              throw new BadRequestException('保存错题失败');
+            });
+        }
+        return {
+          userId,
+          questionId: question.id,
+          yourAnswer,
+          correctAnswer,
+          isCorrect,
+        };
+      },
+      { timeout: 60000 },
+    );
   }
   async checkAnswer(dto: checkAnswerDto, userId: number) {
     const ValidationResult = await this.validateAnswer(dto, userId);
@@ -403,6 +475,7 @@ export class QuestionService {
         update: {
           isCorrect,
           yourAnswer,
+          correctAnswer,
           updatedTime: new Date(),
         },
       })
@@ -478,6 +551,7 @@ export class QuestionService {
             singleAnswer: dto.detailed,
             multiChoiceAnswer: dto.detailed,
             trueFalseAnswer: dto.detailed,
+            subjectiveAnswer: dto.detailed,
           },
         },
       },
@@ -593,6 +667,7 @@ export class QuestionService {
       include: {
         question: {
           select: {
+            bankId: true,
             content: true,
             bank: {
               select: {

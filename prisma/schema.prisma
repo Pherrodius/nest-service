@@ -12,22 +12,23 @@ datasource db {
 }
 
 model User {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique
-  phone           String           @unique
-  password        String
-  createdTime     DateTime         @default(now())
-  avatarUrl       String?
-  introduction    String?
-  direction       String?
-  area            String?
-  gender          Gender?
-  collect         Collection[]
-  banks           Bank[]
-  resolutions     Resolution[]
-  bankCollections BankCollection[]
-  testHistories   TestHistory[]
-  documents       Document[]
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @unique
+  phone                 String                 @unique
+  password              String
+  createdTime           DateTime               @default(now())
+  avatarUrl             String?
+  introduction          String?
+  direction             String?
+  area                  String?
+  gender                Gender?
+  collect               Collection[]
+  banks                 Bank[]
+  resolutions           Resolution[]
+  bankCollections       BankCollection[]
+  testHistories         TestHistory[]
+  documents             Document[]
+  questionConsultations QuestionConsultation[]
 }
 
 enum Gender {
@@ -35,10 +36,17 @@ enum Gender {
   女
 }
 
+enum Role {
+  system
+  user
+  assistant
+}
+
 enum QuestionType {
   SingleChoice
   MultiChoice
   TrueFalse
+  Subjective
 }
 
 enum Answer {
@@ -105,6 +113,7 @@ model Question {
   singleAnswer      SingleAnswer?
   multiChoiceAnswer MultiChoiceAnswer[]
   trueFalseAnswer   TrueFalseAnswer?
+  subjectiveAnswer  SubjectiveAnswer?
   collected         Collection[]
   bank              Bank                @relation(fields: [bankId], references: [id], onDelete: Cascade)
   discipline        Discipline          @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
@@ -137,6 +146,12 @@ model MultiChoiceAnswer {
 model TrueFalseAnswer {
   questionId Int      @id
   answerKey  Answer
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model SubjectiveAnswer {
+  questionId Int      @id
+  reference  String   @db.Text
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
@@ -209,4 +224,13 @@ model Document {
   downloadCount Int            @default(0)
   createdTime   DateTime       @default(now())
   uploader      User           @relation(fields: [uploaderId], references: [id])
+}
+
+model QuestionConsultation {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  role        Role
+  content     String   @db.MediumText
+  createdTime DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

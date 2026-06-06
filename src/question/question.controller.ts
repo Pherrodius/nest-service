@@ -92,6 +92,7 @@ export class QuestionController {
   ) {
     return this.questionService.isCollectionExist(query, user.id);
   }
+
   @Post('check')
   checkAnswer(@Body() body: checkAnswerDto, @CurrentUser() user: AuthUser) {
     return this.questionService.checkAnswer(body, user.id);

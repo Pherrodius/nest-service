@@ -51,13 +51,13 @@ export class createQuestionDto {
   content!: string;
 
   @IsArray()
-  @ArrayMinSize(2)
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => OptionDto)
-  options!: OptionDto[];
+  options?: OptionDto[];
 
   @IsNotEmpty()
-  answer!: Answer | Answer[];
+  answer!: Answer[] | string;
 
   @IsString()
   @IsOptional()
@@ -83,9 +83,10 @@ export class UpdateQuestionDto {
   @IsString()
   content!: string;
   @ArrayMinSize(2)
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => OptionDto)
-  options!: OptionDto[];
+  options?: OptionDto[];
   @IsOptional()
   @IsString()
   explanation?: string;
@@ -98,6 +99,9 @@ export class UpdateQuestionDto {
   @IsOptional()
   @IsArray()
   multiChoiceAnswer?: Answer[];
+  @IsOptional()
+  @IsString()
+  subjectiveAnswer?: string;
   @IsOptional()
   @IsNumber()
   riskLevel?: number;
@@ -132,7 +136,7 @@ export class checkAnswerDto {
   @IsNumber()
   questionId!: number;
   @IsNotEmpty()
-  answer!: Answer | Answer[];
+  answer!: Answer[] | string;
 }
 export class submitTestDto {
   @IsArray()

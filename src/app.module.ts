@@ -9,9 +9,20 @@ import { AuthModule } from './auth/auth.module';
 import { FileModule } from './file/file.module';
 import { SearchModule } from './search/search.module';
 import { LlmModule } from './llm/llm.module';
+import { ConsultationModule } from './consultation/consultation.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UserModule, QuestionModule, BankModule, FileModule, SearchModule, LlmModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    UserModule,
+    QuestionModule,
+    BankModule,
+    FileModule,
+    SearchModule,
+    LlmModule,
+    ConsultationModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

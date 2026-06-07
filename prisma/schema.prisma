@@ -22,6 +22,7 @@ model User {
   direction             String?
   area                  String?
   gender                Gender?
+  tags                  String?                @db.Text
   collect               Collection[]
   banks                 Bank[]
   resolutions           Resolution[]

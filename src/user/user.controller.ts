@@ -11,7 +11,12 @@ import {
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
-import { LoginByNameDto, LoginByPhoneDto } from './dto';
+import {
+  ChangePasswordDto,
+  ChangePhoneDto,
+  LoginByNameDto,
+  LoginByPhoneDto,
+} from './dto';
 import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { ParseIntPipe } from '@nestjs/common';
@@ -62,6 +67,19 @@ export class UserController {
   @Put('profile')
   updateProfile(@CurrentUser() user: AuthUser, @Body() body: UpdateUserDto) {
     return this.userService.updateProfile(user.id, body);
+  }
+
+  @Put('password')
+  changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: ChangePasswordDto,
+  ) {
+    return this.userService.changePassword(user.id, body);
+  }
+
+  @Put('phone')
+  changePhone(@CurrentUser() user: AuthUser, @Body() body: ChangePhoneDto) {
+    return this.userService.changePhone(user.id, body);
   }
 
   @Post('avatar')

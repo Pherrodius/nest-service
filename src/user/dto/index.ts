@@ -5,6 +5,9 @@ import {
   MaxLength,
   Length,
   IsIn,
+  IsArray,
+  ArrayMaxSize,
+  Matches,
 } from 'class-validator';
 export class CreateUserDto {
   @IsString()
@@ -74,4 +77,36 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(['男', '女'])
   gender?: '男' | '女' | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(20, { each: true })
+  tags?: string[];
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(12)
+  newPassword!: string;
+
+  @IsString()
+  @MinLength(6)
+  @MaxLength(12)
+  confirmPassword!: string;
+}
+
+export class ChangePhoneDto {
+  @IsString()
+  password!: string;
+
+  @IsString()
+  @Length(11)
+  @Matches(/^1\d{10}$/)
+  phone!: string;
 }

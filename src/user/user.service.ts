@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -8,6 +10,8 @@ import {
 import { AuthService } from '@/auth/auth.service';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
+  ChangePasswordDto,
+  ChangePhoneDto,
   CreateUserDto,
   LoginByNameDto,
   LoginByPhoneDto,
@@ -32,7 +36,42 @@ export class UserService {
     direction: true,
     area: true,
     gender: true,
+    tags: true,
   };
+
+  private serializeTags(tags?: string[]) {
+    if (!tags) return undefined;
+    return JSON.stringify(tags);
+  }
+
+  private deserializeTags(tags?: string | null) {
+    if (!tags) return [];
+
+    try {
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed)
+        ? parsed.filter((tag): tag is string => typeof tag === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private mapProfile<T extends { tags?: string | null }>(user: T | null) {
+    if (!user) return null;
+    return {
+      ...user,
+      tags: this.deserializeTags(user.tags),
+    };
+  }
+
+  private getUpdateData(updateUserDto: UpdateUserDto) {
+    const { tags, ...userData } = updateUserDto;
+    return {
+      ...userData,
+      tags: this.serializeTags(tags),
+    };
+  }
 
   create(createUserDto: CreateUserDto) {
     if (createUserDto.password !== createUserDto.confirmPassword) {
@@ -118,35 +157,90 @@ export class UserService {
     });
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return this.prismaService.user.update({
+  async update(id: number, updateUserDto: UpdateUserDto) {
+    const user = await this.prismaService.user.update({
       where: { id },
-      data: updateUserDto,
+      data: this.getUpdateData(updateUserDto),
       select: this.userProfileSelect,
     });
+    return this.mapProfile(user);
   }
 
-  getProfile(userId: number) {
-    return this.prismaService.user.findUnique({
+  async getProfile(userId: number) {
+    const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: this.userProfileSelect,
     });
+    return this.mapProfile(user);
   }
 
-  updateProfile(userId: number, updateUserDto: UpdateUserDto) {
-    return this.prismaService.user.update({
+  async updateProfile(userId: number, updateUserDto: UpdateUserDto) {
+    const user = await this.prismaService.user.update({
       where: { id: userId },
-      data: updateUserDto,
+      data: this.getUpdateData(updateUserDto),
       select: this.userProfileSelect,
     });
+    return this.mapProfile(user);
   }
 
-  updateAvatar(userId: number, avatarUrl: string) {
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: { password: true },
+    });
+
+    if (!user || user.password !== changePasswordDto.currentPassword) {
+      throw new BadRequestException('当前密码错误');
+    }
+    if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
+      throw new BadRequestException('两次输入的新密码不一致');
+    }
+    if (changePasswordDto.newPassword === changePasswordDto.currentPassword) {
+      throw new BadRequestException('新密码不能与当前密码相同');
+    }
+
+    await this.prismaService.user.update({
+      where: { id: userId },
+      data: { password: changePasswordDto.newPassword },
+    });
+    return { success: true };
+  }
+
+  async changePhone(userId: number, changePhoneDto: ChangePhoneDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      select: { password: true, phone: true },
+    });
+
+    if (!user || user.password !== changePhoneDto.password) {
+      throw new BadRequestException('当前密码错误');
+    }
+    if (user.phone === changePhoneDto.phone) {
+      throw new BadRequestException('新手机号不能与当前手机号相同');
+    }
+
+    const phoneOwner = await this.prismaService.user.findUnique({
+      where: { phone: changePhoneDto.phone },
+      select: { id: true },
+    });
+    if (phoneOwner) {
+      throw new ConflictException('该手机号已被绑定');
+    }
+
     return this.prismaService.user.update({
+      where: { id: userId },
+      data: { phone: changePhoneDto.phone },
+      select: this.userProfileSelect,
+    }).then((updatedUser) => this.mapProfile(updatedUser));
+  }
+
+  async updateAvatar(userId: number, avatarUrl: string) {
+    const user = await this.prismaService.user.update({
       where: { id: userId },
       data: { avatarUrl },
       select: this.userProfileSelect,
     });
+    return this.mapProfile(user);
   }
   // 获取测试记录
   async getTestHistory(userId: number) {

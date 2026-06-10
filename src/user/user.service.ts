@@ -48,7 +48,7 @@ export class UserService {
     if (!tags) return [];
 
     try {
-      const parsed = JSON.parse(tags);
+      const parsed = JSON.parse(tags) as string[];
       return Array.isArray(parsed)
         ? parsed.filter((tag): tag is string => typeof tag === 'string')
         : [];
@@ -113,11 +113,11 @@ export class UserService {
     }
 
     if (!user) {
-      throw new HttpException('用户不存在', HttpStatus.NOT_FOUND);
+      throw new NotFoundException('用户不存在');
     }
 
     if (user.password !== loginDto.password) {
-      throw new HttpException('密码错误', HttpStatus.UNAUTHORIZED);
+      throw new BadRequestException('用户名或密码错误');
     }
 
     const authUser = {
@@ -227,11 +227,13 @@ export class UserService {
       throw new ConflictException('该手机号已被绑定');
     }
 
-    return this.prismaService.user.update({
-      where: { id: userId },
-      data: { phone: changePhoneDto.phone },
-      select: this.userProfileSelect,
-    }).then((updatedUser) => this.mapProfile(updatedUser));
+    return this.prismaService.user
+      .update({
+        where: { id: userId },
+        data: { phone: changePhoneDto.phone },
+        select: this.userProfileSelect,
+      })
+      .then((updatedUser) => this.mapProfile(updatedUser));
   }
 
   async updateAvatar(userId: number, avatarUrl: string) {

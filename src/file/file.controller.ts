@@ -49,7 +49,10 @@ export class FileController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (!file.mimetype.startsWith('application/')) {
+        if (
+          !file.mimetype.startsWith('application/') &&
+          !file.mimetype.startsWith('text/')
+        ) {
           cb(new BadRequestException('只能上传文件'), false);
           return;
         }
